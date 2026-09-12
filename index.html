@@ -779,7 +779,6 @@ svg text {
   </header>
 
   <!-- Main 100vh Layout -->
-  <!-- Main 100vh Layout -->
   <main class="app-main">
 
     <!-- Left Column: Compact Workflow Diagram Canvas & Legend -->
@@ -926,22 +925,22 @@ svg text {
           <g id="box-ctrl" class="node-box" onclick="showNodeInspector('controllermanager')">
             <rect id="glow-ctrl" class="glow-rect" x="208" y="198" width="184" height="74" rx="12" fill="none" stroke="#f43f5e" stroke-width="3.5" opacity="0"/>
             <rect x="210" y="200" width="180" height="70" rx="11" fill="url(#grad-ctrl)" stroke="#3b82f6" stroke-width="1.5"/>
-            <rect x="304" y="206" width="78" height="14" rx="4" fill="rgba(245, 158, 11, 0.2)" stroke="#f59e0b" stroke-width="0.8"/>
-            <text x="343" y="216" text-anchor="middle" font-size="8.5" font-weight="700" fill="#fde68a">👁️ WATCHER</text>
-            <text x="256" y="222" font-size="13" font-weight="700" fill="#f8fafc">kube-controller-</text>
-            <text x="256" y="238" font-size="13" font-weight="700" fill="#f8fafc">manager</text>
-            <text x="220" y="258" font-size="10" fill="#94a3b8">ReplicaSet / Deployment Controllers</text>
+            <rect x="306" y="204" width="78" height="14" rx="4" fill="rgba(245, 158, 11, 0.2)" stroke="#f59e0b" stroke-width="0.8"/>
+            <text x="345" y="214" text-anchor="middle" font-size="8.5" font-weight="700" fill="#fde68a">👁️ WATCHER</text>
+            <text x="300" y="232" text-anchor="middle" font-size="13" font-weight="700" fill="#f8fafc">kube-controller-</text>
+            <text x="300" y="246" text-anchor="middle" font-size="13" font-weight="700" fill="#f8fafc">manager</text>
+            <text x="300" y="260" text-anchor="middle" font-size="9" fill="#94a3b8">ReplicaSet / Deployment Controllers</text>
           </g>
 
           <!-- 5. CONTROL PLANE: Scheduler -->
           <g id="box-sched" class="node-box" onclick="showNodeInspector('scheduler')">
             <rect id="glow-sched" class="glow-rect" x="268" y="348" width="184" height="74" rx="12" fill="none" stroke="#f43f5e" stroke-width="3.5" opacity="0"/>
             <rect x="270" y="350" width="180" height="70" rx="11" fill="url(#grad-sched)" stroke="#3b82f6" stroke-width="1.5"/>
-            <rect x="364" y="356" width="78" height="14" rx="4" fill="rgba(245, 158, 11, 0.2)" stroke="#f59e0b" stroke-width="0.8"/>
-            <text x="403" y="366" text-anchor="middle" font-size="8.5" font-weight="700" fill="#fde68a">👁️ WATCHER</text>
-            <text x="282" y="375" font-size="14" font-weight="700" fill="#f8fafc">kube-scheduler</text>
-            <text x="282" y="393" font-size="10.5" fill="#94a3b8">Decides Node assignment</text>
-            <text x="282" y="407" font-size="9" fill="#60a5fa">1. Filter (Predicates) &rarr; 2. Score (Priorities)</text>
+            <rect x="366" y="354" width="78" height="14" rx="4" fill="rgba(245, 158, 11, 0.2)" stroke="#f59e0b" stroke-width="0.8"/>
+            <text x="405" y="364" text-anchor="middle" font-size="8.5" font-weight="700" fill="#fde68a">👁️ WATCHER</text>
+            <text x="360" y="378" text-anchor="middle" font-size="14" font-weight="700" fill="#f8fafc">kube-scheduler</text>
+            <text x="360" y="394" text-anchor="middle" font-size="10.5" fill="#94a3b8">Decides Node assignment</text>
+            <text x="360" y="410" text-anchor="middle" font-size="9" fill="#60a5fa">1. Filter (Predicates) &rarr; 2. Score (Priorities)</text>
           </g>
 
           <!-- 6. WORKER NODE: kubelet -->
@@ -1114,11 +1113,11 @@ svg text {
 </div>
 
 <script>
-// Master Step Definitions (12 Detailed Production Flow Steps)
+// Master Step Definitions (12 Simplified Production Flow Steps)
 const steps = [
   {
     num: 1,
-    title: "kubectl client sends HTTPS Scale Request to kube-apiserver",
+    title: "kubectl sends Scale Request to kube-apiserver",
     layer: "Client Tier",
     layerTag: "tag-client",
     mechanism: "REST over TLS (Port 6443)",
@@ -1126,29 +1125,22 @@ const steps = [
     color: "#3b82f6",
     glows: ["glow-kubectl", "glow-api"],
     arrows: ["af-1"],
-    narrative: `User ya CI/CD pipeline command run karta hai: <strong>kubectl scale deployment flipkart-app --replicas=10</strong>.
+    narrative: `<strong>Kya hua?</strong> User ne command run ki: <code>kubectl scale deployment flipkart-app --replicas=10</code>.
     <br><br>
-    kubectl aapke <code>~/.kube/config</code> file se cluster certificate aur token uthata hai aur ek <strong>HTTPS PATCH</strong> request bhejta hai:
-    <span class="term term-blue">PATCH /apis/apps/v1/namespaces/default/deployments/flipkart-app</span>.
-    <br><br>
-    <strong>Kubernetes Rule #1:</strong> External world (kubectl, Helm, CI/CD) cluster me <em>sirf aur sirf</em> <strong>kube-apiserver</strong> se baat kar sakti hai. Kisi aur component ke paas seedhe aane ka direct rasta nahi hota!`,
+    &bull; <strong>Action:</strong> <code>kubectl</code> ne API Server ko secure HTTPS request bheji: <em>"Mujhe flipkart-app ke 10 Pods chahiye!"</em>
+    <br>
+    &bull; <strong>Golden Rule:</strong> Cluster ke bahar se koi bhi tool (kubectl, Helm, CI/CD) sirf aur sirf <strong>kube-apiserver</strong> se hi baat kar sakta hai. Kisi aur component ke paas direct access nahi hota.`,
     watchText: null,
-    interviewTip: "Interview Question: Kya kubectl seedha etcd me write kar sakta hai? Bilkul nahi! etcd cluster network ke andar private hota hai aur sirf API Server se mTLS authentication ke through connect hota hai.",
+    interviewTip: "Kya kubectl direct etcd me write kar sakta hai? Bilkul nahi! etcd cluster ka private store hai, usse sirf API Server mTLS ke through baat karta hai.",
     specProtocol: "HTTP/2 PATCH via TLS",
-    specCode: `PATCH /apis/apps/v1/namespaces/default/deployments/flipkart-app HTTP/2
-Host: k8s-master:6443
-Authorization: Bearer eyJhbGciOiJSUz...
-Content-Type: application/strategic-merge-patch+json
-
+    specCode: `PATCH /apis/apps/v1/namespaces/default/deployments/flipkart-app
 {
-  "spec": {
-    "replicas": 10
-  }
+  "spec": { "replicas": 10 }
 }`
   },
   {
     num: 2,
-    title: "kube-apiserver: Authentication &rarr; Authorization &rarr; Admission Control",
+    title: "kube-apiserver: Security Gate (AuthN &rarr; AuthZ &rarr; Admission)",
     layer: "Control Plane",
     layerTag: "tag-controlplane",
     mechanism: "API Server Internal Pipeline",
@@ -1156,24 +1148,23 @@ Content-Type: application/strategic-merge-patch+json
     color: "#3b82f6",
     glows: ["glow-api"],
     arrows: [],
-    narrative: `API Server request receive karne ke baad 3-stage security pipeline se pass karta hai:
+    narrative: `<strong>Kya hua?</strong> API Server request ko aage bhejne se pehle 3 security check karta hai:
     <br><br>
-    1. <strong>Authentication (AuthN):</strong> Check karta hai client kaun hai (X509 Client Cert, OIDC, ya ServiceAccount token).<br>
-    2. <strong>Authorization (AuthZ):</strong> RBAC check karta hai: Kya user <code>admin</code> ke paas namespace <code>default</code> me deployments ko <code>patch</code> karne ka adhikar hai?<br>
-    3. <strong>Mutating &amp; Validating Admission Controllers:</strong> Check karta hai OPA Gatekeeper / Kyverno policies, resource quotas, aur default settings inject karta hai.`,
+    1. <strong>Authentication (Kaun ho tum?):</strong> Client ka Token ya Certificate verify kiya.<br>
+    2. <strong>Authorization (Kya permission hai?):</strong> RBAC se check kiya ki kya user ko scale karne ka adhikar hai.<br>
+    3. <strong>Admission Control (Rules sahi hain?):</strong> Resource quota aur security policies check ki.<br>
+    <br>
+    &bull; Teeno checks <strong>PASS</strong> hone ke baad hi request aage badhti hai.`,
     watchText: null,
-    interviewTip: "Mutating Admission controllers request ko modify/inject kar sakte hain (jaise Istio sidecar injection), jabki Validating Admission controllers sirf YES/NO bolte hain.",
-    specProtocol: "API Server Internal Handlers",
-    specCode: `Pipeline Stages:
-1. AuthN: User="devops-lead", Groups=["system:masters"]
-2. AuthZ: RBAC ClusterRoleBinding -> Allowed: Rule match
-3. Mutating Webhooks: Default annotations applied
-4. Schema Validation: Spec matches OpenAPI v3 schema
-5. Validating Webhooks: Quota check OK (Max Replicas: 50)`
+    interviewTip: "Mutating webhook request me badlaav kar sakta hai (jaise Istio sidecar inject karna), jabki Validating webhook sirf allow ya deny karta hai.",
+    specProtocol: "API Server Pipeline",
+    specCode: `1. AuthN: User="devops" -> Valid ✅
+2. AuthZ: RBAC Role -> Allowed ✅
+3. Admission: Quota Check (Max 50) -> Passed ✅`
   },
   {
     num: 3,
-    title: "kube-apiserver saves Desired State (10 replicas) into etcd",
+    title: "kube-apiserver saves Desired State (10 replicas) in etcd",
     layer: "Control Plane & Storage",
     layerTag: "tag-storage",
     mechanism: "gRPC over mTLS (Port 2379)",
@@ -1181,26 +1172,20 @@ Content-Type: application/strategic-merge-patch+json
     color: "#8b5cf6",
     glows: ["glow-api", "glow-etcd"],
     arrows: ["af-2"],
-    narrative: `Validation pass hone ke baad, <strong>kube-apiserver</strong> etcd ko gRPC call karta hai aur new desired state persist karta hai:
-    <span class="term term-purple">Key: /registry/deployments/default/flipkart-app</span>, Replicas = 10.
+    narrative: `<strong>Kya hua?</strong> API Server ne new desired state ko <strong>etcd database</strong> me save kar diya.
     <br><br>
-    etcd isko apne <strong>Raft consensus log</strong> (WAL - Write Ahead Log) me likhta hai aur multi-version concurrency control (MVCC) revision update karta hai. etcd se confirmation milte hi API Server kubectl ko <strong>HTTP 200 OK</strong> response return kar deta hai.`,
+    &bull; <strong>etcd kya hai?</strong> Ye Kubernetes ki hard disk/diary hai jahan cluster ka pura state persist hota hai.<br>
+    &bull; <strong>Result:</strong> State save hote hi API Server ne user ko <strong>HTTP 200 OK</strong> bol diya: <em>"Aapka scale request accept ho gaya!"</em>`,
     watchText: null,
-    interviewTip: "etcd is a distributed, consistent Key-Value store based on Raft. K8s cluster ka pura state etcd me hota hai; agar etcd ka backup hai to pura cluster restore kiya ja sakta hai.",
+    interviewTip: "etcd Raft consensus protocol use karta hai. Cluster ka state hamesha consistent rehta hai. Agar etcd ka backup hai, to pura cluster recover ho sakta hai.",
     specProtocol: "gRPC KV Put",
-    specCode: `rpc Put(PutRequest) returns (PutResponse) {
-  key: "/registry/deployments/default/flipkart-app"
-  value: {
-    "metadata": { "name": "flipkart-app", "generation": 2 },
-    "spec": { "replicas": 10 }
-  }
-  prev_kv: { "replicas": 3 }
-}
--> etcd Revision: 184920 (WAL synced to disk)`
+    specCode: `Key: /registry/deployments/default/flipkart-app
+Value: { "replicas": 10 }
+-> etcd Revision: 184920 [SAVED]`
   },
   {
     num: 4,
-    title: "Watch Event Pushed to Controller Manager (Deployment & ReplicaSet)",
+    title: "Watch Event Pushed to Controller Manager",
     layer: "Control Plane",
     layerTag: "tag-controlplane",
     mechanism: "👁️ Long-Lived Watch Stream",
@@ -1208,30 +1193,20 @@ Content-Type: application/strategic-merge-patch+json
     color: "#f59e0b",
     glows: ["glow-ctrl", "glow-api"],
     arrows: ["af-3"],
-    narrative: `Ab magic shuru hota hai! <strong>kube-controller-manager</strong> ne API Server se pehle se hi ek <em>permanent HTTP/2 Watch connection</em> bana rakha tha.
+    narrative: `<strong>Kya hua?</strong> <strong>kube-controller-manager</strong> API Server se live juda hua tha (Watch Stream).
     <br><br>
-    Jaise hi etcd me Deployment update hua, API Server ne turant Controller Manager ko <strong>Push notification</strong> bheja:
-    <span class="term term-gold">Event: MODIFIED (flipkart-app replicas = 10)</span>.
-    <br><br>
-    <strong>Deployment Controller</strong> wake-up hota hai aur underlying <strong>ReplicaSet</strong> ki target replicas ko 10 set kar deta hai.`,
-    watchText: "Ye PULL polling nahi hai! Kubernetes me controllers bar-bar 'kya naya hai?' nahi poochhte. Client-go Informer / Reflector pattern me HTTP/2 stream open rehti hai. API Server khud changes push karta hai as Event chunks!",
-    interviewTip: "What is an Informer in Kubernetes? Informer is a client-go caching mechanism that uses 'ListWatch' (initial list + streaming watch) and maintains a local in-memory cache with DeltaFIFO queues to prevent overloading the API server.",
-    specProtocol: "HTTP/2 Event Stream Push",
-    specCode: `GET /apis/apps/v1/deployments?watch=true HTTP/2
-Transfer-Encoding: chunked
-
-{
-  "type": "MODIFIED",
-  "object": {
-    "kind": "Deployment",
-    "metadata": { "name": "flipkart-app", "resourceVersion": "184920" },
-    "spec": { "replicas": 10 }
-  }
-}`
+    &bull; <strong>Real-time Alert:</strong> Jaise hi etcd me update hua, API Server ne turant Controller Manager ko push kiya: <em>"flipkart-app ko 10 replicas chahiye!"</em><br>
+    &bull; <strong>Deployment Controller</strong> jaagta hai aur underlying <strong>ReplicaSet</strong> ko target 10 set kar deta hai.`,
+    watchText: "Ye baar-baar polling nahi hai! Kubernetes Informer pattern use karta hai jisme HTTP/2 connection hamesha open rehta hai aur API Server khud changes push karta hai.",
+    interviewTip: "Informer kya hota hai? Ye client-go ka caching mechanism hai jo API server se live event stream lekar local memory cache update rakhta hai.",
+    specProtocol: "HTTP/2 Event Push",
+    specCode: `Event: MODIFIED
+Target: Deployment flipkart-app
+New Replicas: 10`
   },
   {
     num: 5,
-    title: "ReplicaSet Controller reconciles: Gap of 7 Pods detected!",
+    title: "ReplicaSet Controller: Gap of 7 Pods detected!",
     layer: "Control Plane",
     layerTag: "tag-controlplane",
     mechanism: "Reconciliation Loop & API Call",
@@ -1239,33 +1214,21 @@ Transfer-Encoding: chunked
     color: "#f59e0b",
     glows: ["glow-ctrl", "glow-api", "glow-etcd"],
     arrows: ["af-4", "af-5"],
-    narrative: `Controller Manager ke andar <strong>ReplicaSet Controller</strong> apna <em>Reconcile Loop</em> chalata hai:
+    narrative: `<strong>Kya hua?</strong> ReplicaSet Controller ne hisaab lagaya:
     <br><br>
-    <code>Desired Replicas (10) - Current Replicas (3) = 7 Pods missing!</code>
-    <br><br>
-    ReplicaSet Controller khud container run nahi kar sakta. Woh API Server ko 7 alag-alag <strong>POST /api/v1/namespaces/default/pods</strong> requests bhejta hai.
-    <br><br>
-    API Server in 7 Pods ko validate karke etcd me likhta hai:
-    <span class="term term-blue">spec.nodeName: ""</span> (Khaali) aur <span class="term term-gold">status.phase: Pending</span>.`,
+    &bull; <strong>Formula:</strong> <code>Desired (10) - Current (3) = 7 Pods missing!</code><br>
+    &bull; Controller khud container run nahi karta. Usne API Server ko <strong>7 naye Pods create karne ki request</strong> bheji.<br>
+    &bull; API Server ne 7 Pods etcd me save kiye, lekin abhi unka <code>nodeName: ""</code> (khaali) hai aur status <strong>Pending</strong> hai.`,
     watchText: null,
-    interviewTip: "Note karo: Controller Manager Pod manifest me node ka naam nahi daalta! Wo nodeName ko blank chhod deta hai. Node assign karna sirf aur sirf Scheduler ka kaam hai.",
-    specProtocol: "HTTP/2 POST /api/v1/pods",
-    specCode: `POST /api/v1/namespaces/default/pods
-{
-  "metadata": { "name": "flipkart-app-d8f9b-4" },
-  "spec": {
-    "nodeName": "",          <-- EMPTY! Needs scheduling
-    "containers": [{
-      "name": "app",
-      "image": "flipkart/web:v2"
-    }]
-  },
-  "status": { "phase": "Pending" }
-}`
+    interviewTip: "Dhyan rahe: Controller Manager Pod manifest me node ka naam nahi daalta! Wo nodeName blank chhodta hai kyunki Node chunna Scheduler ka kaam hai.",
+    specProtocol: "POST /api/v1/pods x7",
+    specCode: `Creating Pod: flipkart-app-d8f9b-4
+spec.nodeName: ""    <-- Khali (Needs node)
+status.phase: Pending`
   },
   {
     num: 6,
-    title: "kube-scheduler catches Pending Pods via Watch stream",
+    title: "kube-scheduler catches Pending Pods via Watch",
     layer: "Control Plane",
     layerTag: "tag-controlplane",
     mechanism: "👁️ Long-Lived Watch Stream",
@@ -1273,28 +1236,20 @@ Transfer-Encoding: chunked
     color: "#f59e0b",
     glows: ["glow-sched", "glow-api"],
     arrows: ["af-6"],
-    narrative: `<strong>kube-scheduler</strong> bhi API Server ko continuously <em>Watch</em> kar raha hai!
+    narrative: `<strong>Kya hua?</strong> <strong>kube-scheduler</strong> bhi API Server ko continuous <em>Watch</em> kar raha hota hai.
     <br><br>
-    Specifically wo filter laga ke rakhta hai: <code>fieldSelector: spec.nodeName==""</code> (wo saare Pods jinka koi node assign nahi hua hai).
-    <br><br>
-    API Server 7 naye Pending Pods ke <span class="term term-gold">Event: ADDED</span> Scheduler ke Informer ko push karta hai. Scheduler inhe apne internal <strong>Scheduling Priority Queue (activeQ)</strong> me queue kar leta hai.`,
-    watchText: "Scheduler bhi seedha etcd nahi dekhta. Scheduler ka Informer API Server ke saath HTTP/2 streaming session rakhta hai aur jaise hi naya unassigned Pod create hota hai, turant activate ho jata hai.",
-    interviewTip: "Agar cluster me Scheduler crash ho jaye, to kya hoga? Naye Pods create ho jayenge, lekin hamesha 'Pending' state me rahenge kyunki unhe koi node assign karne wala nahi hoga!",
-    specProtocol: "HTTP/2 Watch Filter",
-    specCode: `GET /api/v1/pods?fieldSelector=spec.nodeName%3D%22%22&watch=true
-
-{
-  "type": "ADDED",
-  "object": {
-    "metadata": { "name": "flipkart-app-d8f9b-4" },
-    "spec": { "nodeName": "" },
-    "status": { "phase": "Pending" }
-  }
-}`
+    &bull; Wo sirf un Pods par nazar rakhta hai jinka <code>nodeName == ""</code> (bina node wale).<br>
+    &bull; Jaise hi 7 naye Pending Pods aaye, Scheduler ne unhe apni priority queue me daal liya taaki unke liye sabse best Node chun sake.`,
+    watchText: "Scheduler bhi direct etcd nahi dekhta. Uska Informer API Server ke saath live stream maintain karta hai aur unassigned Pods ko pakad leta hai.",
+    interviewTip: "Agar cluster me Scheduler crash ho jaye to kya hoga? Naye Pods create to ho jayenge par hamesha 'Pending' state me rahenge kyunki koi Node assign karne wala nahi hoga.",
+    specProtocol: "Watch Event: ADDED",
+    specCode: `Pod: flipkart-app-d8f9b-4
+Status: Pending
+Action: Added to Scheduler Priority Queue (activeQ)`
   },
   {
     num: 7,
-    title: "Scheduler 2-Phase Algorithm: Filtering (Predicates) & Scoring (Priorities)",
+    title: "Scheduler 2-Phase Logic: Filter & Score Nodes",
     layer: "Control Plane",
     layerTag: "tag-controlplane",
     mechanism: "Internal Compute Cycle",
@@ -1302,37 +1257,23 @@ Transfer-Encoding: chunked
     color: "#3b82f6",
     glows: ["glow-sched"],
     arrows: ["af-7"],
-    narrative: `Scheduler har pending Pod ke liye do primary phases execute karta hai:
+    narrative: `<strong>Kya hua?</strong> Scheduler har pending Pod ke liye do aasan step karta hai:
     <br><br>
-    <strong>Phase 1: Filtering (Predicates):</strong> Unfit nodes ko bahar fekta hai:
-    <br>&bull; <em>NodeResourcesFit:</em> Kya node ke paas required CPU/RAM hai?
-    <br>&bull; <em>Taints &amp; Tolerations:</em> Kya node tainted hai?
-    <br>&bull; <em>NodeAffinity:</em> Kya label matches hain?
-    <br><br>
-    <strong>Phase 2: Scoring (Priorities):</strong> Bacche hue nodes ko 0-100 score deta hai:
-    <br>&bull; <em>LeastAllocated / BalancedAllocation:</em> Resources ko balance rakhna.
-    <br>&bull; <em>ImageLocality:</em> Kya docker image pehle se node pe cached hai?
-    <br><br>
-    Faisla: <strong>Worker-Node-1</strong> gets highest score (96/100)!`,
+    1. <strong>Filtering (Unfit nodes hatao):</strong> Jis node par CPU/RAM kam ho ya taints lage hon, unhe list se nikal diya.<br>
+    2. <strong>Scoring (Marks do):</strong> Bacche hue nodes ko 0-100 score diya (resource balance, cached image, etc.).<br>
+    <br>
+    &bull; <strong>Faisla:</strong> <code>worker-node-1</code> ko 96/100 marks mile aur wo winner bana!`,
     watchText: null,
-    interviewTip: "Interview Question: Kya Scheduler khud Pod ko start karta hai? Nahi! Scheduler sirf ek matchmaker hai—ye sirf yeh decide karta hai ki kaunsa Pod kaunse Node pe jayega.",
-    specProtocol: "Scheduler Algorithm Pipeline",
-    specCode: `Scheduling Pod: flipkart-app-d8f9b-4
-Nodes evaluated: [node-1, node-2, node-3]
-
-Filter Phase:
-  node-1: PASS (CPU: 4 cores free, RAM: 8GB free)
-  node-2: PASS (CPU: 2 cores free, RAM: 4GB free)
-  node-3: FAIL (Tainted: dedicated=database)
-
-Score Phase:
-  node-1 Score: 96 (Image flipkart/web:v2 cached + high RAM)
-  node-2 Score: 78
--> WINNER: node-1`
+    interviewTip: "Scheduler container start nahi karta! Ye sirf ek matchmaker hai jo decide karta hai ki kaunsa Pod kaunse Node par fit hoga.",
+    specProtocol: "Scheduler Algorithm",
+    specCode: `Evaluating Nodes:
+- node-1: PASS -> Score: 96 (WINNER 🏆)
+- node-2: PASS -> Score: 78
+- node-3: FAIL (Insufficient CPU)`
   },
   {
     num: 8,
-    title: "Scheduler issues Binding Request &rarr; API Server updates etcd",
+    title: "Scheduler sends Binding Request to API Server",
     layer: "Control Plane",
     layerTag: "tag-controlplane",
     mechanism: "POST /binding to API Server",
@@ -1340,31 +1281,21 @@ Score Phase:
     color: "#3b82f6",
     glows: ["glow-sched", "glow-api", "glow-etcd"],
     arrows: ["af-8", "af-2"],
-    narrative: `Scheduler apna decision execute karne ke liye API Server ko ek <strong>Binding</strong> object POST karta hai:
-    <span class="term term-blue">POST /api/v1/namespaces/default/pods/flipkart-app-d8f9b-4/binding</span>.
+    narrative: `<strong>Kya hua?</strong> Scheduler ne apna faisla execute karne ke liye API Server ko <strong>Binding</strong> request bheji:
     <br><br>
-    Target node: <code>worker-node-1</code>.
-    <br><br>
-    API Server etcd me Pod object ko update karta hai: <code>spec.nodeName = "worker-node-1"</code>.
-    Ab Pod officially <strong>Scheduled</strong> ho chuka hai, lekin container abhi tak run nahi hua!`,
+    &bull; <em>"flipkart-app Pods ko worker-node-1 par bhej do!"</em><br>
+    &bull; API Server ne etcd me update kar diya: <code>spec.nodeName = "worker-node-1"</code>.<br>
+    &bull; Ab Pod officially <strong>Scheduled</strong> ho chuka hai, par container abhi start nahi hua!`,
     watchText: null,
-    interviewTip: "Never forget: Scheduler directly etcd ko touch nahi karta! Wo bhi API Server ke /binding subresource endpoint pe HTTP call karta hai.",
-    specProtocol: "HTTP/2 Binding Subresource",
-    specCode: `POST /api/v1/namespaces/default/pods/flipkart-app-d8f9b-4/binding
-{
-  "apiVersion": "v1",
-  "kind": "Binding",
-  "target": {
-    "apiVersion": "v1",
-    "kind": "Node",
-    "name": "worker-node-1"
-  }
-}
--> etcd updated: spec.nodeName = "worker-node-1"`
+    interviewTip: "Scheduler direct etcd me update nahi karta! Wo bhi API Server ke /binding endpoint pe HTTP call karta hai.",
+    specProtocol: "POST /api/v1/binding",
+    specCode: `Target Pod: flipkart-app-d8f9b-4
+Assigned Node: worker-node-1
+-> etcd updated successfully!`
   },
   {
     num: 9,
-    title: "Worker Node's kubelet catches its assigned Pod (via Watch!)",
+    title: "Worker Node's kubelet catches its Pod (via Watch!)",
     layer: "Worker Node",
     layerTag: "tag-workernode",
     mechanism: "👁️ Node-Filtered Watch Stream",
@@ -1372,56 +1303,45 @@ Score Phase:
     color: "#10b981",
     glows: ["glow-kubelet", "glow-api"],
     arrows: ["af-9"],
-    narrative: `<strong>Yeh sabse important step hai jo notes me tha!</strong>
+    narrative: `<strong>Kya hua?</strong> Worker Node ka captain hai <strong>kubelet</strong>.
     <br><br>
-    <strong>kubelet</strong> Worker Node ka captain hai. Ye Worker Node pe chal raha hota hai (<span class="term term-green">Green Layer</span>), <strong>LEKIN</strong> ye API Server ke saath <em>continuous Watch stream</em> maintain karta hai (<span class="term term-gold">Gold Watcher 👁️</span>):
-    <br><br>
-    <code>GET /api/v1/pods?fieldSelector=spec.nodeName=worker-node-1&watch=true</code>
-    <br><br>
-    Jaise hi API Server ne etcd me <code>spec.nodeName = "worker-node-1"</code> likha, API Server ne <strong>Worker-Node-1 ke kubelet</strong> ko push kiya: <em>'Tumhare liye naya Pod assign hua hai!'</em>`,
-    watchText: "Aapka doubt: Kubelet worker node ka part hai (Green), lekin uska kaam karne ka tareeqa Watch connection hai (Gold 👁️)! Isliye diagram me Kubelet ke paas dono badges hain: [WORKER NODE] + [👁️ WATCHER]. Kubelet na to polling karta hai, na hi etcd se baat karta hai.",
-    interviewTip: "How does kubelet know about its pods? kubelet runs a SyncLoop driven by an Informer that watches the API Server filtered strictly by its own node name.",
-    specProtocol: "HTTP/2 Field-Filtered Watch Push",
-    specCode: `GET /api/v1/pods?fieldSelector=spec.nodeName%3Dworker-node-1&watch=true
-
-{
-  "type": "MODIFIED",
-  "object": {
-    "metadata": { "name": "flipkart-app-d8f9b-4" },
-    "spec": { "nodeName": "worker-node-1" },
-    "status": { "phase": "Pending" }
-  }
-}`
+    &bull; kubelet Worker Node par rehta hai, lekin API Server se live <strong>Watch</strong> stream par juda hota hai.<br>
+    &bull; Jaise hi API Server ne <code>nodeName = "worker-node-1"</code> likha, kubelet ke paas notification aaya: <em>"Aapke node ke liye naya Pod assign hua hai, isko run karo!"</em>`,
+    watchText: "Kubelet worker node ka part hai (Green), lekin uska connect hone ka tareeqa Watch connection hai (Gold 👁️). Isliye Kubelet ke paas dono badges hain!",
+    interviewTip: "kubelet ko kaise pata chalta hai ki uske node ke liye pod aaya hai? kubelet apna SyncLoop chalata hai aur API Server ko apne node name par filter karke watch karta hai.",
+    specProtocol: "HTTP/2 Watch Push",
+    specCode: `Pod: flipkart-app-d8f9b-4
+Assigned to: worker-node-1
+Action: kubelet SyncLoop triggered!`
   },
   {
     num: 10,
-    title: "kubelet coordinates CRI (containerd), CNI (Network), & CSI (Storage)",
+    title: "kubelet coordinates CRI (containerd), CNI (Network), & CSI",
     layer: "Worker Node Execution",
     layerTag: "tag-workernode",
-    mechanism: "gRPC CRI Unix Socket (/run/containerd/containerd.sock)",
+    mechanism: "gRPC CRI Unix Socket",
     mechTag: "tag-workernode",
     color: "#06b6d4",
     glows: ["glow-kubelet", "glow-runtime", "glow-pod"],
     arrows: ["af-10", "af-10b"],
-    narrative: `kubelet ab node pe locally 3 modular systems ko order deta hai:
+    narrative: `<strong>Kya hua?</strong> kubelet ne local worker node par apne 3 assistants ko order diya:
     <br><br>
-    1. <strong>CSI (Storage):</strong> ConfigMaps, Secrets, PVC volumes ko host directory me mount karta hai.<br>
-    2. <strong>CRI (Container Runtime Interface):</strong> kubelet gRPC call karta hai containerd ko: <code>RunPodSandbox</code> (pause container banta hai jo network namespace banata hai).<br>
-    3. <strong>CNI (Container Network Interface - Calico/Flannel):</strong> Pod ko IP assign karta hai (e.g. <code>10.244.1.42</code>) aur virtual ethernet (veth pair) create karta hai.<br>
-    4. <strong>Image Pull & Run:</strong> Image pull hoti hai aur application container start hota hai!`,
+    1. <strong>CRI (containerd):</strong> Pod sandbox banao aur application container image pull karke run karo.<br>
+    2. <strong>CNI (Calico/Flannel):</strong> Pod ko private IP (e.g. <code>10.244.1.42</code>) aur virtual network interface do.<br>
+    3. <strong>CSI (Storage):</strong> ConfigMaps, Secrets, ya Disk storage mount karo.<br>
+    <br>
+    &bull; <strong>Result:</strong> Container successfully start ho gaya!`,
     watchText: null,
-    interviewTip: "What is the pause container? Every K8s Pod has an invisible 'pause' infrastructure container that holds the Network namespace (IP address & port mapping) and IPC namespace so containers inside the Pod can communicate over localhost.",
+    interviewTip: "Pause container kya hota hai? Har Pod me ek chhota 'pause' infrastructure container hota hai jo Pod ka IP address aur Network namespace hold karke rakhta hai.",
     specProtocol: "gRPC CRI API",
-    specCode: `1. RunPodSandboxRequest -> Sandbox ID: c3a18d...
-2. CNI Plugin: ADD veth0 -> IP: 10.244.1.42/24
-3. PullImageRequest: "flipkart/web:v2" -> Pulled
-4. CreateContainerRequest:
-   Image: "flipkart/web:v2", Ports: [8080]
-5. StartContainerRequest: Container Started!`
+    specCode: `1. CRI: RunPodSandbox -> Created
+2. CNI: Assign IP 10.244.1.42
+3. Image: flipkart/web:v2 pulled
+4. Container: Started ✅`
   },
   {
     num: 11,
-    title: "kubelet runs Probes & reports Status (Running) back to API Server",
+    title: "kubelet checks Health & reports Running to API Server",
     layer: "Worker Node & Control Plane",
     layerTag: "tag-workernode",
     mechanism: "PATCH /status to API Server",
@@ -1429,58 +1349,41 @@ Score Phase:
     color: "#10b981",
     glows: ["glow-kubelet", "glow-api", "glow-etcd", "glow-pod"],
     arrows: ["af-11", "af-2"],
-    narrative: `Container start hone ke baad kubelet use turant ready nahi maanta:
+    narrative: `<strong>Kya hua?</strong> Container start hone ke baad kubelet ne health check run kiye:
     <br><br>
-    &bull; <strong>Startup Probe:</strong> Check karta hai application bootstrap ho gayi?<br>
-    &bull; <strong>Readiness Probe:</strong> <code>GET /healthz</code> status 200 return karta hai &rarr; Ready!<br>
-    <br>
-    kubelet API Server ko status report bhejta hai:
-    <span class="term term-green">PATCH /api/v1/.../pods/status</span>:
-    <code>phase = "Running"</code>, <code>PodReady = True</code>, <code>IP = 10.244.1.42</code>.
-    <br><br>
-    API Server yeh data etcd me save karta hai.`,
+    &bull; <strong>Startup & Readiness Probe:</strong> <code>GET /healthz</code> check kiya. Response 200 OK aaya &rarr; Ready!<br>
+    &bull; kubelet ne API Server ko report bheja: <em>"Pod ab officially <strong>RUNNING</strong> aur <strong>READY</strong> hai, IP = 10.244.1.42"</em>.<br>
+    &bull; API Server ne ye new status etcd me update kar diya.`,
     watchText: null,
-    interviewTip: "Difference between Liveness and Readiness probe: Liveness failure results in kubelet killing and restarting the container. Readiness failure removes the Pod from Service Endpoints so no user traffic is sent to it.",
-    specProtocol: "HTTP/2 PATCH /status",
-    specCode: `PATCH /api/v1/namespaces/default/pods/flipkart-app-d8f9b-4/status
-{
-  "status": {
-    "phase": "Running",
-    "podIP": "10.244.1.42",
-    "conditions": [
-      { "type": "Ready", "status": "True" },
-      { "type": "ContainersReady", "status": "True" }
-    ]
-  }
-}`
+    interviewTip: "Liveness vs Readiness probe: Liveness fail hone par kubelet container restart karta hai. Readiness fail hone par Pod se traffic hata diya jata hai taaki users ko error na dikhe.",
+    specProtocol: "PATCH /api/v1/pods/status",
+    specCode: `Status: Running
+PodReady: True
+IP: 10.244.1.42
+Reported by: kubelet to API Server`
   },
   {
     num: 12,
-    title: "kube-proxy & EndpointSlice: iptables/IPVS updated, Traffic live!",
+    title: "kube-proxy & EndpointSlice: Traffic Live!",
     layer: "Worker Node & Network Data Plane",
     layerTag: "tag-workernode",
-    mechanism: "👁️ Watcher + Linux Kernel Netfilter (iptables/IPVS/eBPF)",
+    mechanism: "👁️ Watcher + Linux Kernel Netfilter (iptables/IPVS)",
     mechTag: "tag-watch",
     color: "#10b981",
     glows: ["glow-proxy", "glow-api", "glow-pod"],
     arrows: ["af-12"],
-    narrative: `Final step! Pod ready ho gaya, lekin users tak traffic kaise pahuchega?
+    narrative: `<strong>Final Step!</strong> Pod ready ho gaya, ab us tak real users ka traffic bhejna hai:
     <br><br>
-    1. Controller Manager ka <strong>EndpointSlice Controller</strong> watch kar raha tha. Pod ready hote hi usne Service ke <code>EndpointSlice</code> me new Pod IP <code>10.244.1.42:8080</code> add kiya.<br>
-    2. <strong>kube-proxy</strong> (jo har worker node pe chal raha hai aur EndpointSlices ko <span class="term term-gold">Watch</span> kar raha hai) detect karta hai new endpoint!<br>
-    3. kube-proxy node ke Linux kernel me <strong>iptables / IPVS / eBPF</strong> rules update karta hai.<br>
+    1. <strong>EndpointSlice Controller:</strong> Service ke endpoints me naye Pod ka IP (<code>10.244.1.42:8080</code>) add kiya.<br>
+    2. <strong>kube-proxy:</strong> (jo Endpoints ko Watch kar raha tha) ne Linux kernel me <strong>iptables / IPVS</strong> rules update kar diye.<br>
     <br>
-    Ab user traffic automatically sabhi 10 Pods me equally load balance hone lagta hai! 🎉 Flipkart Big Billion Day Sale ready!`,
-    watchText: "Notice karo: kube-proxy bhi ek Worker Node component hai (Green), lekin wo bhi API Server ke saath Watch stream banakar rakhta hai (Gold 👁️) taaki Services aur Endpoints ke changes turant kernel me push kar sake!",
-    interviewTip: "Why IPVS over iptables in kube-proxy? iptables is sequential O(n) lookup. When cluster has 10,000+ services, iptables creates severe packet delay. IPVS uses hash tables with O(1) performance!",
-    specProtocol: "Kernel Netfilter Rules Update",
-    specCode: `EndpointSlice updated:
-- Endpoint: 10.244.1.42:8080 (Ready: true)
-
-kube-proxy kernel sync:
-- iptables -t nat -A KUBE-SVC-FLIPKART -m statistic --mode random --probability 0.10 -j KUBE-SEP-POD4
-- Packet DNAT -> 10.244.1.42:8080
-Total Pods serving traffic: 10/10 [SUCCESS]`
+    &bull; <strong>🎉 Result:</strong> Ab real customer traffic automatically sabhi 10 Pods me load balance hone laga! Sale ready!`,
+    watchText: "kube-proxy bhi Worker Node par chalta hai (Green), lekin API Server se Services aur Endpoints ko Watch karta rehta hai (Gold 👁️) taaki naye Pods aate hi kernel rules update kar sake.",
+    interviewTip: "kube-proxy me IPVS kyu behtar hai iptables se? iptables linear O(n) search karta hai, jabki IPVS hash tables use karta hai jo O(1) ultra fast performance deta hai.",
+    specProtocol: "Kernel Rules Update",
+    specCode: `Endpoint Added: 10.244.1.42:8080
+kube-proxy: iptables/IPVS synced
+Result: 10/10 Pods live & serving traffic! 🚀`
   }
 ];
 
