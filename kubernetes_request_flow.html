@@ -1,0 +1,1761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kubernetes Complete Request Flow & Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-base: #0b0f19;
+  --bg-surface-1: #111827;
+  --bg-surface-2: #1f293d;
+  --bg-surface-3: #28354f;
+  --border: #334155;
+  --border-glow: #3b82f688;
+  
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  
+  --cp-blue: #3b82f6;
+  --cp-blue-bg: rgba(59, 130, 246, 0.12);
+  --cp-blue-border: #60a5fa;
+
+  --wn-green: #10b981;
+  --wn-green-bg: rgba(16, 185, 129, 0.12);
+  --wn-green-border: #34d399;
+
+  --etcd-purple: #8b5cf6;
+  --etcd-purple-bg: rgba(139, 92, 246, 0.12);
+  --etcd-purple-border: #a78bfa;
+
+  --watch-gold: #f59e0b;
+  --watch-gold-bg: rgba(245, 158, 11, 0.12);
+  --watch-gold-border: #fbbf24;
+
+  --runtime-cyan: #06b6d4;
+  --runtime-cyan-bg: rgba(6, 182, 212, 0.12);
+  --runtime-cyan-border: #22d3ee;
+
+  --active-red: #f43f5e;
+  --active-glow: rgba(244, 63, 94, 0.4);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  height: 100dvh;
+  width: 100%;
+  overflow: hidden; /* Strict 100vh - no window scrollbars */
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Master 100vh Application Wrapper */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100vh;
+  max-height: 100dvh;
+  width: 100vw;
+  max-width: 100vw;
+  padding: 8px 12px;
+  gap: 8px;
+  overflow: hidden;
+}
+
+/* Compact Header */
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  height: 42px;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.brand-icon {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, #2563eb, #38bdf8);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+  flex-shrink: 0;
+}
+.brand-info {
+  min-width: 0;
+}
+.brand h1 {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  background: linear-gradient(to right, #ffffff, #93c5fd);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.brand p {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.brand p code {
+  color: #38bdf8;
+  font-family: 'Fira Code', monospace;
+  font-size: 10.5px;
+  background: rgba(56, 189, 248, 0.1);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.btn {
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface-2);
+  color: var(--text-primary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  user-select: none;
+}
+.btn:hover:not(:disabled) {
+  background: var(--bg-surface-3);
+  border-color: #475569;
+  transform: translateY(-1px);
+}
+.btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.btn-primary {
+  background: #2563eb;
+  border-color: #3b82f6;
+  color: #fff;
+}
+.btn-primary:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+.btn-watch-toggle.active {
+  background: var(--watch-gold-bg);
+  border-color: var(--watch-gold-border);
+  color: #fde68a;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.35);
+}
+
+/* 2-Column Split Workspace on Desktop (100vh) */
+.app-main {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 10px;
+  overflow: hidden;
+}
+
+/* Left Panel: Diagram + Legend */
+.diagram-panel {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-surface-1);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  min-height: 0;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+.panel-header-strip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 10px;
+  background: var(--bg-surface-2);
+  border-bottom: 1px solid var(--border);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.panel-header-strip span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.diagram-viewport {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding: 4px;
+  background: radial-gradient(circle at center, #131d33 0%, #0c1220 100%);
+  overflow: hidden;
+}
+
+.diagram-canvas {
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  display: block;
+  object-fit: contain;
+}
+
+/* SVG Diagram Styles */
+svg text {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  user-select: none;
+}
+.node-box {
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+.node-box:hover {
+  filter: brightness(1.25);
+}
+.glow-rect {
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+.flow-line {
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+
+/* Informer Watch Streams */
+.watch-stream {
+  transition: opacity 0.35s ease, stroke-dashoffset 0.35s ease;
+}
+.watch-stream.pulse-anim {
+  animation: watchDash 1.2s linear infinite;
+}
+@keyframes watchDash {
+  from { stroke-dashoffset: 24; }
+  to { stroke-dashoffset: 0; }
+}
+
+/* Compact Horizontal Legend Bar */
+.legend-bar {
+  background: var(--bg-surface-2);
+  border-top: 1px solid var(--border);
+  padding: 5px 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 10.5px;
+  overflow-x: auto;
+  white-space: nowrap;
+  flex-shrink: 0;
+  scrollbar-width: none;
+}
+.legend-bar::-webkit-scrollbar {
+  display: none;
+}
+.legend-title {
+  font-weight: 700;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 9.5px;
+  margin-right: 2px;
+}
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-secondary);
+}
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.legend-badge {
+  font-size: 8.5px;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+
+/* Right Panel: Step Controller & Details */
+.details-panel {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-surface-1);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  min-height: 0;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+/* Always Visible Step Navigation Bar (Pinned at top of details panel - NEVER scrolls away!) */
+.step-nav-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px;
+  background: var(--bg-surface-2);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.step-nav-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.step-scrubber {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 1px 0;
+}
+.step-scrubber::-webkit-scrollbar {
+  display: none;
+}
+.scrub-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  background: var(--bg-surface-1);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+.scrub-dot:hover {
+  border-color: #60a5fa;
+  color: #fff;
+}
+.scrub-dot.active {
+  background: #2563eb;
+  border-color: #60a5fa;
+  color: #fff;
+  box-shadow: 0 0 8px rgba(37, 99, 235, 0.6);
+}
+.step-counter {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Scrollable Step Content (Only this section scrolls if needed) */
+.step-content-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Custom Slim Scrollbar */
+.step-content-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+.step-content-scroll::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.4);
+  border-radius: 4px;
+}
+.step-content-scroll::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+.step-content-scroll::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+.step-headline {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.step-headline-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.step-index-pill {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  display: inline-flex;
+}
+.step-title-text {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+.step-tags {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.tag {
+  font-size: 9.5px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.tag-controlplane { background: var(--cp-blue-bg); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.4); }
+.tag-workernode   { background: var(--wn-green-bg); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.4); }
+.tag-storage      { background: var(--etcd-purple-bg); color: #c4b5fd; border: 1px solid rgba(139, 92, 246, 0.4); }
+.tag-client       { background: rgba(56, 189, 248, 0.12); color: #7dd3fc; border: 1px solid rgba(56, 189, 248, 0.4); }
+.tag-watch        { background: var(--watch-gold-bg); color: #fde68a; border: 1px solid rgba(245, 158, 11, 0.4); }
+
+.step-narrative {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #cbd5e1;
+  background: rgba(17, 24, 39, 0.6);
+  padding: 9px 11px;
+  border-radius: 8px;
+  border: 1px solid rgba(51, 65, 85, 0.6);
+}
+.step-narrative strong {
+  color: #fff;
+  font-weight: 600;
+}
+.step-narrative .term {
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 11.5px;
+}
+.term-blue { background: rgba(59, 130, 246, 0.2); color: #93c5fd; }
+.term-green { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; }
+.term-gold { background: rgba(245, 158, 11, 0.2); color: #fde68a; }
+.term-purple { background: rgba(139, 92, 246, 0.2); color: #c4b5fd; }
+.term-cyan { background: rgba(6, 182, 212, 0.2); color: #67e8f9; }
+
+/* Callout Boxes */
+.callout-box {
+  border-radius: 7px;
+  padding: 8px 10px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  display: flex;
+  gap: 8px;
+}
+.callout-watch {
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #fde68a;
+}
+.callout-interview {
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: #bfdbfe;
+}
+.callout-icon {
+  font-size: 15px;
+  flex-shrink: 0;
+  line-height: 1.2;
+}
+
+/* Tech Spec Card */
+.tech-spec-card {
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  overflow: hidden;
+}
+.tech-spec-header {
+  padding: 5px 9px;
+  background: var(--bg-surface-3);
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  letter-spacing: 0.05em;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.tech-spec-body {
+  padding: 8px 10px;
+  font-family: 'Fira Code', monospace;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: #a5f3fc;
+  max-height: 140px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* Node Inspector Modal/Drawer */
+.inspector-card {
+  display: none;
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  width: 340px;
+  background: #1e293b;
+  border: 1px solid #475569;
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8);
+  z-index: 1000;
+  animation: slideUp 0.2s ease-out;
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.inspector-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.inspector-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.inspector-close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 2px 5px;
+}
+.inspector-close:hover {
+  color: #fff;
+}
+.inspector-body {
+  font-size: 11.5px;
+  color: #cbd5e1;
+  line-height: 1.5;
+}
+.inspector-field {
+  margin-top: 6px;
+  padding-top: 5px;
+  border-top: 1px solid #334155;
+}
+.inspector-field-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+/* ==========================================================================
+   Mobile & Responsive Layout (< 960px & Phones)
+   Workflow covers less space so buttons & content are strictly within 100vh!
+   ========================================================================== */
+@media (max-width: 960px) {
+  .app-container {
+    padding: 6px 8px;
+    height: 100dvh;
+    gap: 6px;
+  }
+
+  .app-header {
+    height: 38px;
+    padding-bottom: 4px;
+    gap: 6px;
+  }
+
+  .brand-icon {
+    width: 28px;
+    height: 28px;
+  }
+  .brand-icon svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .brand h1 {
+    font-size: 13px;
+  }
+
+  .brand p {
+    display: none; /* Hide subtitle on phones to save vertical space */
+  }
+
+  .top-actions {
+    gap: 4px;
+  }
+  .btn {
+    font-size: 10.5px;
+    padding: 4px 7px;
+    border-radius: 5px;
+  }
+
+  /* Vertical Stack on Mobile: Workflow diagram takes LESS space (~28vh), buttons always pinned! */
+  .app-main {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+    gap: 6px;
+  }
+
+  .diagram-panel {
+    height: 28vh; /* Reduced vertical space for workflow */
+    max-height: 28vh;
+    min-height: 150px;
+  }
+
+  .panel-header-strip {
+    padding: 3px 8px;
+    font-size: 9px;
+  }
+
+  .diagram-viewport {
+    padding: 2px;
+  }
+
+  .legend-bar {
+    padding: 3px 8px;
+    font-size: 9.5px;
+    gap: 8px;
+  }
+
+  .step-nav-bar {
+    padding: 5px 8px;
+    gap: 6px;
+  }
+
+  .step-scrubber {
+    max-width: 145px;
+  }
+
+  .scrub-dot {
+    width: 20px;
+    height: 20px;
+    font-size: 9px;
+  }
+
+  .step-content-scroll {
+    padding: 8px 10px 12px;
+    gap: 8px;
+  }
+
+  .step-title-text {
+    font-size: 13px;
+  }
+
+  .step-narrative {
+    font-size: 11.5px;
+    padding: 7px 9px;
+  }
+
+  .callout-box {
+    padding: 7px 9px;
+    font-size: 11px;
+  }
+
+  .tech-spec-body {
+    font-size: 9.5px;
+    max-height: 110px;
+  }
+
+  .inspector-card {
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    width: auto;
+    max-width: 100%;
+  }
+}
+
+/* Extra small mobile screens (< 480px) */
+@media (max-width: 480px) {
+  .brand h1 {
+    font-size: 12px;
+  }
+  .top-actions .btn span:last-child {
+    display: none; /* Icon-only buttons for compact header on very small screens */
+  }
+  .diagram-panel {
+    height: 25vh;
+    max-height: 25vh;
+  }
+  .step-scrubber {
+    max-width: 120px;
+  }
+}
+</style>
+</head>
+<body>
+
+<div class="app-container">
+
+  <!-- Compact Header -->
+  <header class="app-header">
+    <div class="brand">
+      <div class="brand-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polygon points="12 2 15 8 22 9 17 14 18 21 12 17 6 21 7 14 2 9 9 8 12 2"></polygon>
+        </svg>
+      </div>
+      <div class="brand-info">
+        <h1>Kubernetes Request Flow & Architecture</h1>
+        <p>Production Scale: <code>kubectl scale deployment flipkart-app --replicas=10</code> (3 &rarr; 10 Pods)</p>
+      </div>
+    </div>
+    
+    <div class="top-actions">
+      <button class="btn btn-watch-toggle" id="btn-toggle-watch" onclick="toggleWatchMesh()" title="Toggle Informer Watch Streams">
+        <span>👁️</span> <span id="watch-toggle-text">Watch Streams</span>
+      </button>
+      <button class="btn" id="btn-autoplay" onclick="toggleAutoPlay()" title="Auto Play Flow">
+        <span id="play-icon">▶</span> <span id="play-text">Auto Play</span>
+      </button>
+      <button class="btn" onclick="resetFlow()" title="Reset to Step 1">
+        <span>↺</span> <span>Reset</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main 100vh Layout -->
+  <main class="app-main">
+
+    <!-- Left Column: Compact Workflow Diagram Canvas & Legend -->
+    <section class="diagram-panel">
+      <div class="panel-header-strip">
+        <span>⚡ Interactive Cluster Topology</span>
+        <span style="color:var(--text-muted); font-size:9.5px; font-weight:500;">Click any box to inspect</span>
+      </div>
+
+      <div class="diagram-viewport">
+        <svg id="diagram" class="diagram-canvas" viewBox="0 0 1000 520" role="img" aria-label="Kubernetes Architecture Flow">
+          <defs>
+            <!-- Arrow markers -->
+            <marker id="arr-gray" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M2 1L8 5L2 9" fill="none" stroke="#475569" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </marker>
+            <marker id="arr-active" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M2 1L8 5L2 9" fill="none" stroke="#f43f5e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </marker>
+            <marker id="arr-gold" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+              <path d="M2 1L8 5L2 9" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </marker>
+            <marker id="arr-green" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M2 1L8 5L2 9" fill="none" stroke="#10b981" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </marker>
+
+            <!-- Component Box Gradients -->
+            <linearGradient id="grad-client" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#1e293b"/>
+              <stop offset="100%" stop-color="#0f172a"/>
+            </linearGradient>
+            <linearGradient id="grad-api" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#1e3a8a"/>
+              <stop offset="100%" stop-color="#172554"/>
+            </linearGradient>
+            <linearGradient id="grad-etcd" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#3b0764"/>
+              <stop offset="100%" stop-color="#2e1065"/>
+            </linearGradient>
+            <linearGradient id="grad-ctrl" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#1e293b"/>
+              <stop offset="100%" stop-color="#111827"/>
+            </linearGradient>
+            <linearGradient id="grad-sched" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#1e293b"/>
+              <stop offset="100%" stop-color="#111827"/>
+            </linearGradient>
+            <linearGradient id="grad-kubelet" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#064e3b"/>
+              <stop offset="100%" stop-color="#022c22"/>
+            </linearGradient>
+            <linearGradient id="grad-runtime" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#164e63"/>
+              <stop offset="100%" stop-color="#083344"/>
+            </linearGradient>
+            <linearGradient id="grad-proxy" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#064e3b"/>
+              <stop offset="100%" stop-color="#022c22"/>
+            </linearGradient>
+          </defs>
+
+          <!-- ================= BACKGROUND REGIONS ================= -->
+          <!-- Client Tier Box -->
+          <rect x="20" y="24" width="130" height="472" rx="14" fill="#0f172a" stroke="#334155" stroke-width="1" stroke-dasharray="4 4" opacity="0.8"/>
+          <text x="32" y="46" font-size="11" font-weight="700" fill="#94a3b8" letter-spacing="0.08em">CLIENT TIER</text>
+
+          <!-- Control Plane Region -->
+          <rect x="175" y="24" width="460" height="472" rx="16" fill="rgba(30, 58, 138, 0.05)" stroke="#3b82f6" stroke-width="1.2" stroke-dasharray="6 4" opacity="0.6"/>
+          <text x="192" y="46" font-size="12" font-weight="700" fill="#60a5fa" letter-spacing="0.06em">CONTROL PLANE (MASTER NODE)</text>
+          <text x="525" y="46" font-size="10" fill="#93c5fd" opacity="0.7">Cluster State &amp; Scheduling</text>
+
+          <!-- Worker Node Region -->
+          <rect x="660" y="24" width="320" height="472" rx="16" fill="rgba(16, 185, 129, 0.05)" stroke="#10b981" stroke-width="1.2" stroke-dasharray="6 4" opacity="0.6"/>
+          <text x="676" y="46" font-size="12" font-weight="700" fill="#34d399" letter-spacing="0.06em">WORKER NODE: node-1</text>
+          <text x="860" y="46" font-size="10" fill="#6ee7b7" opacity="0.7">Pod Execution Plane</text>
+
+          <!-- ================= STATIC / IDLE CONNECTION LINES ================= -->
+          <line x1="140" y1="90" x2="225" y2="90" stroke="#334155" stroke-width="1.5" marker-end="url(#arr-gray)"/>
+          <line x1="390" y1="90" x2="475" y2="90" stroke="#334155" stroke-width="1.5" marker-end="url(#arr-gray)"/>
+          <line x1="260" y1="125" x2="260" y2="200" stroke="#334155" stroke-width="1.5" marker-end="url(#arr-gray)"/>
+          <line x1="345" y1="125" x2="345" y2="350" stroke="#334155" stroke-width="1.5" marker-end="url(#arr-gray)"/>
+          <path d="M375 110 C 530 110, 570 100, 680 100" fill="none" stroke="#334155" stroke-width="1.5" marker-end="url(#arr-gray)"/>
+          <line x1="755" y1="125" x2="755" y2="215" stroke="#334155" stroke-width="1.5" marker-end="url(#arr-gray)"/>
+          <line x1="755" y1="285" x2="755" y2="355" stroke="#334155" stroke-width="1.5" marker-end="url(#arr-gray)"/>
+          <path d="M370 120 C 540 140, 620 420, 680 435" fill="none" stroke="#334155" stroke-width="1.5" marker-end="url(#arr-gray)"/>
+
+          <!-- ================= ALL PERMANENT WATCH CONNECTIONS ================= -->
+          <path id="mesh-w-ctrl" class="watch-stream" d="M 285 200 C 285 160, 285 150, 285 125" fill="none" stroke="#f59e0b" stroke-width="1.6" stroke-dasharray="5 3" opacity="0.25" marker-end="url(#arr-gold)"/>
+          <path id="mesh-w-sched" class="watch-stream" d="M 365 350 C 365 240, 365 180, 365 125" fill="none" stroke="#f59e0b" stroke-width="1.6" stroke-dasharray="5 3" opacity="0.25" marker-end="url(#arr-gold)"/>
+          <path id="mesh-w-kubelet" class="watch-stream" d="M 680 85 C 570 70, 480 70, 375 85" fill="none" stroke="#f59e0b" stroke-width="1.8" stroke-dasharray="5 3" opacity="0.3" marker-end="url(#arr-gold)"/>
+          <path id="mesh-w-proxy" class="watch-stream" d="M 680 445 C 530 445, 480 200, 375 115" fill="none" stroke="#f59e0b" stroke-width="1.6" stroke-dasharray="5 3" opacity="0.25" marker-end="url(#arr-gold)"/>
+
+          <!-- ================= ACTIVE FLOW PATHS ================= -->
+          <path id="af-1" class="flow-line" d="M 140 90 L 225 90" fill="none" stroke="#f43f5e" stroke-width="3" marker-end="url(#arr-active)" opacity="0"/>
+          <path id="af-2" class="flow-line" d="M 375 90 L 475 90" fill="none" stroke="#f43f5e" stroke-width="3" marker-end="url(#arr-active)" opacity="0"/>
+          <path id="af-3" class="flow-line" d="M 270 125 L 270 200" fill="none" stroke="#f59e0b" stroke-width="3" stroke-dasharray="6 3" marker-end="url(#arr-gold)" opacity="0"/>
+          <path id="af-4" class="flow-line" d="M 250 200 L 250 125" fill="none" stroke="#f43f5e" stroke-width="3" marker-end="url(#arr-active)" opacity="0"/>
+          <path id="af-5" class="flow-line" d="M 375 90 L 475 90" fill="none" stroke="#f43f5e" stroke-width="3" marker-end="url(#arr-active)" opacity="0"/>
+          <path id="af-6" class="flow-line" d="M 335 125 L 335 350" fill="none" stroke="#f59e0b" stroke-width="3" stroke-dasharray="6 3" marker-end="url(#arr-gold)" opacity="0"/>
+          <path id="af-7" class="flow-line" d="M 430 385 C 470 385, 470 420, 430 420" fill="none" stroke="#f43f5e" stroke-width="3" marker-end="url(#arr-active)" opacity="0"/>
+          <path id="af-8" class="flow-line" d="M 355 350 L 355 125" fill="none" stroke="#f43f5e" stroke-width="3" marker-end="url(#arr-active)" opacity="0"/>
+          <path id="af-9" class="flow-line" d="M 375 80 C 490 60, 580 60, 680 80" fill="none" stroke="#f59e0b" stroke-width="3" stroke-dasharray="6 3" marker-end="url(#arr-gold)" opacity="0"/>
+          <path id="af-10" class="flow-line" d="M 755 125 L 755 215" fill="none" stroke="#10b981" stroke-width="3.5" marker-end="url(#arr-green)" opacity="0"/>
+          <path id="af-10b" class="flow-line" d="M 755 285 L 755 355" fill="none" stroke="#10b981" stroke-width="3.5" marker-end="url(#arr-green)" opacity="0"/>
+          <path id="af-11" class="flow-line" d="M 680 105 C 560 115, 480 115, 375 105" fill="none" stroke="#f43f5e" stroke-width="3" marker-end="url(#arr-active)" opacity="0"/>
+          <path id="af-12" class="flow-line" d="M 370 120 C 530 140, 620 420, 680 435" fill="none" stroke="#f43f5e" stroke-width="3" marker-end="url(#arr-active)" opacity="0"/>
+
+          <!-- ================= COMPONENT NODES ================= -->
+          <!-- 1. CLIENT: kubectl -->
+          <g id="box-kubectl" class="node-box" onclick="showNodeInspector('kubectl')">
+            <rect id="glow-kubectl" class="glow-rect" x="28" y="60" width="114" height="66" rx="10" fill="none" stroke="#f43f5e" stroke-width="3.5" opacity="0"/>
+            <rect x="30" y="62" width="110" height="62" rx="9" fill="url(#grad-client)" stroke="#475569" stroke-width="1.5"/>
+            <text x="85" y="88" text-anchor="middle" font-size="13" font-weight="700" fill="#f8fafc">kubectl</text>
+            <text x="85" y="104" text-anchor="middle" font-size="10.5" fill="#94a3b8">CLI / CI-CD</text>
+            <rect x="52" y="111" width="66" height="11" rx="3" fill="#334155" opacity="0.6"/>
+            <text x="85" y="119" text-anchor="middle" font-size="8" font-weight="600" fill="#93c5fd">HTTPS / REST</text>
+          </g>
+
+          <!-- 2. CONTROL PLANE: kube-apiserver -->
+          <g id="box-api" class="node-box" onclick="showNodeInspector('apiserver')">
+            <rect id="glow-api" class="glow-rect" x="226" y="56" width="152" height="74" rx="12" fill="none" stroke="#f43f5e" stroke-width="3.5" opacity="0"/>
+            <rect x="228" y="58" width="148" height="70" rx="11" fill="url(#grad-api)" stroke="#3b82f6" stroke-width="2"/>
+            <text x="302" y="83" text-anchor="middle" font-size="14" font-weight="800" fill="#ffffff">kube-apiserver</text>
+            <text x="302" y="99" text-anchor="middle" font-size="10.5" fill="#bfdbfe">Central Hub &amp; Gatekeeper</text>
+            <rect x="238" y="106" width="38" height="13" rx="3" fill="#1e40af"/>
+            <text x="257" y="115" text-anchor="middle" font-size="8" font-weight="700" fill="#dbeafe">AuthN</text>
+            <rect x="281" y="106" width="38" height="13" rx="3" fill="#1e40af"/>
+            <text x="300" y="115" text-anchor="middle" font-size="8" font-weight="700" fill="#dbeafe">AuthZ</text>
+            <rect x="324" y="106" width="44" height="13" rx="3" fill="#1e40af"/>
+            <text x="346" y="115" text-anchor="middle" font-size="8" font-weight="700" fill="#dbeafe">Admission</text>
+          </g>
+
+          <!-- 3. CONTROL PLANE: etcd -->
+          <g id="box-etcd" class="node-box" onclick="showNodeInspector('etcd')">
+            <rect id="glow-etcd" class="glow-rect" x="474" y="58" width="144" height="70" rx="12" fill="none" stroke="#f43f5e" stroke-width="3.5" opacity="0"/>
+            <rect x="476" y="60" width="140" height="66" rx="11" fill="url(#grad-etcd)" stroke="#8b5cf6" stroke-width="1.8"/>
+            <text x="546" y="85" text-anchor="middle" font-size="14" font-weight="800" fill="#ffffff">etcd</text>
+            <text x="546" y="101" text-anchor="middle" font-size="10.5" fill="#ddd6fe">Source of Truth (Raft MVCC)</text>
+            <rect x="502" y="108" width="88" height="12" rx="3" fill="#581c87"/>
+            <text x="546" y="117" text-anchor="middle" font-size="8.5" font-weight="700" fill="#e9d5ff">Only API Server talks</text>
+          </g>
+
+          <!-- 4. CONTROL PLANE: Controller Manager -->
+          <g id="box-ctrl" class="node-box" onclick="showNodeInspector('controllermanager')">
+            <rect id="glow-ctrl" class="glow-rect" x="208" y="198" width="184" height="74" rx="12" fill="none" stroke="#f43f5e" stroke-width="3.5" opacity="0"/>
+            <rect x="210" y="200" width="180" height="70" rx="11" fill="url(#grad-ctrl)" stroke="#3b82f6" stroke-width="1.5"/>
+            <rect x="304" y="206" width="78" height="14" rx="4" fill="rgba(245, 158, 11, 0.2)" stroke="#f59e0b" stroke-width="0.8"/>
+            <text x="343" y="216" text-anchor="middle" font-size="8.5" font-weight="700" fill="#fde68a">👁️ WATCHER</text>
+            <text x="256" y="222" font-size="13" font-weight="700" fill="#f8fafc">kube-controller-</text>
+            <text x="256" y="238" font-size="13" font-weight="700" fill="#f8fafc">manager</text>
+            <text x="220" y="258" font-size="10" fill="#94a3b8">ReplicaSet / Deployment Controllers</text>
+          </g>
+
+          <!-- 5. CONTROL PLANE: Scheduler -->
+          <g id="box-sched" class="node-box" onclick="showNodeInspector('scheduler')">
+            <rect id="glow-sched" class="glow-rect" x="268" y="348" width="184" height="74" rx="12" fill="none" stroke="#f43f5e" stroke-width="3.5" opacity="0"/>
+            <rect x="270" y="350" width="180" height="70" rx="11" fill="url(#grad-sched)" stroke="#3b82f6" stroke-width="1.5"/>
+            <rect x="364" y="356" width="78" height="14" rx="4" fill="rgba(245, 158, 11, 0.2)" stroke="#f59e0b" stroke-width="0.8"/>
+            <text x="403" y="366" text-anchor="middle" font-size="8.5" font-weight="700" fill="#fde68a">👁️ WATCHER</text>
+            <text x="282" y="375" font-size="14" font-weight="700" fill="#f8fafc">kube-scheduler</text>
+            <text x="282" y="393" font-size="10.5" fill="#94a3b8">Decides Node assignment</text>
+            <text x="282" y="407" font-size="9" fill="#60a5fa">1. Filter (Predicates) &rarr; 2. Score (Priorities)</text>
+          </g>
+
+          <!-- 6. WORKER NODE: kubelet -->
+          <g id="box-kubelet" class="node-box" onclick="showNodeInspector('kubelet')">
+            <rect id="glow-kubelet" class="glow-rect" x="678" y="60" width="154" height="68" rx="12" fill="none" stroke="#f43f5e" stroke-width="3.5" opacity="0"/>
+            <rect x="680" y="62" width="150" height="64" rx="11" fill="url(#grad-kubelet)" stroke="#10b981" stroke-width="2"/>
+            <rect x="688" y="68" width="62" height="13" rx="3" fill="#047857"/>
+            <text x="719" y="77" text-anchor="middle" font-size="7.5" font-weight="700" fill="#a7f3d0">WORKER NODE</text>
+            <rect x="754" y="68" width="68" height="13" rx="3" fill="rgba(245, 158, 11, 0.25)" stroke="#f59e0b" stroke-width="0.8"/>
+            <text x="788" y="77" text-anchor="middle" font-size="7.5" font-weight="700" fill="#fde68a">👁️ WATCHER</text>
+            <text x="755" y="99" text-anchor="middle" font-size="14" font-weight="800" fill="#ffffff">kubelet</text>
+            <text x="755" y="114" text-anchor="middle" font-size="10" fill="#a7f3d0">Node Captain / SyncLoop</text>
+          </g>
+
+          <!-- 7. WORKER NODE: Container Runtime & CNI -->
+          <g id="box-runtime" class="node-box" onclick="showNodeInspector('runtime')">
+            <rect id="glow-runtime" class="glow-rect" x="678" y="213" width="154" height="74" rx="12" fill="none" stroke="#f43f5e" stroke-width="3.5" opacity="0"/>
+            <rect x="680" y="215" width="150" height="70" rx="11" fill="url(#grad-runtime)" stroke="#06b6d4" stroke-width="1.8"/>
+            <text x="755" y="238" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">CRI (containerd)</text>
+            <text x="755" y="254" text-anchor="middle" font-size="10.5" fill="#a5f3fc">&amp; CNI Network (Calico)</text>
+            <rect x="696" y="261" width="118" height="14" rx="3" fill="#0e7490" opacity="0.6"/>
+            <text x="755" y="271" text-anchor="middle" font-size="8.5" font-weight="600" fill="#cffafe">CRI gRPC Socket + veth</text>
+          </g>
+
+          <!-- 8. WORKER NODE: Pod Container Sandbox -->
+          <g id="box-pod" class="node-box" onclick="showNodeInspector('pod')">
+            <rect id="glow-pod" class="glow-rect" x="678" y="353" width="154" height="68" rx="12" fill="none" stroke="#f43f5e" stroke-width="3.5" opacity="0"/>
+            <rect x="680" y="355" width="150" height="64" rx="11" fill="#0f172a" stroke="#10b981" stroke-width="1.5" stroke-dasharray="3 3"/>
+            <text x="755" y="378" text-anchor="middle" font-size="12.5" font-weight="700" fill="#34d399">Pod: flipkart-app-x</text>
+            <text x="755" y="394" text-anchor="middle" font-size="10" fill="#94a3b8">IP: 10.244.1.42 (Running)</text>
+            <text x="755" y="408" text-anchor="middle" font-size="9" fill="#6ee7b7">Startup &amp; Readiness: PASS</text>
+          </g>
+
+          <!-- 9. WORKER NODE: kube-proxy -->
+          <g id="box-proxy" class="node-box" onclick="showNodeInspector('kubeproxy')">
+            <rect id="glow-proxy" class="glow-rect" x="678" y="433" width="284" height="54" rx="10" fill="none" stroke="#f43f5e" stroke-width="3.5" opacity="0"/>
+            <rect x="680" y="435" width="280" height="50" rx="9" fill="url(#grad-proxy)" stroke="#10b981" stroke-width="1.5"/>
+            <rect x="874" y="441" width="78" height="13" rx="3" fill="rgba(245, 158, 11, 0.25)" stroke="#f59e0b" stroke-width="0.8"/>
+            <text x="913" y="450" text-anchor="middle" font-size="7.5" font-weight="700" fill="#fde68a">👁️ WATCHER</text>
+            <text x="695" y="456" font-size="13" font-weight="700" fill="#ffffff">kube-proxy</text>
+            <text x="695" y="472" font-size="10" fill="#a7f3d0">Kernel IP Tables / IPVS / eBPF rules update for ClusterIP</text>
+          </g>
+        </svg>
+      </div>
+
+      <!-- Compact Legend Bar -->
+      <div class="legend-bar">
+        <span class="legend-title">Legend:</span>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:var(--cp-blue)"></div>
+          <span>Control Plane</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:var(--wn-green)"></div>
+          <span>Worker Node</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:var(--etcd-purple)"></div>
+          <span>etcd Store</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-badge" style="background:var(--watch-gold-bg); color:#fde68a; border:1px solid var(--watch-gold-border)">👁️ Watcher</span>
+          <span>HTTP/2 Watch</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:var(--runtime-cyan)"></div>
+          <span>Runtime/CNI</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:var(--active-red); box-shadow:0 0 5px var(--active-red)"></div>
+          <span>Active Flow</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right Column: Step Controller & Detailed Narrative/Spec Pane -->
+    <section class="details-panel">
+      
+      <!-- Step Navigation & Scrubber Bar (ALWAYS PINNED AT TOP - 0 SCROLL TO CLICK) -->
+      <div class="step-nav-bar">
+        <div class="step-nav-controls">
+          <button class="btn" id="btn-prev" onclick="changeStep(-1)" disabled title="Previous Step (Left Arrow)">
+            <span>&larr;</span> Prev
+          </button>
+          <button class="btn btn-primary" id="btn-next" onclick="changeStep(1)" title="Next Step (Right Arrow or Space)">
+            Next <span>&rarr;</span>
+          </button>
+        </div>
+
+        <!-- 12-Step Scrubber -->
+        <div class="step-scrubber" id="step-scrubber">
+          <!-- Populated by JS -->
+        </div>
+
+        <div class="step-counter" id="step-counter">
+          Step 1 of 12
+        </div>
+      </div>
+
+      <!-- Scrollable Step Details Area -->
+      <div class="step-content-scroll">
+        
+        <!-- Step Headline & Tags -->
+        <div class="step-headline">
+          <div class="step-headline-top">
+            <div class="step-index-pill" id="step-pill" style="background:var(--cp-blue-bg); color:var(--cp-blue-border); border:1px solid var(--cp-blue);">
+              STEP 1
+            </div>
+            <div class="step-tags" id="step-tags">
+              <!-- Injected by JS -->
+            </div>
+          </div>
+          <h2 class="step-title-text" id="step-title">
+            kubectl client sends HTTPS Scale Request to kube-apiserver
+          </h2>
+        </div>
+
+        <!-- Detailed Narrative in Hinglish + English -->
+        <div class="step-narrative" id="step-narrative">
+          <!-- Injected by JS -->
+        </div>
+
+        <!-- Watch Callout (When relevant) -->
+        <div class="callout-box callout-watch" id="step-watch-box" style="display:none;">
+          <span class="callout-icon">👁️</span>
+          <div>
+            <strong style="color:#fbbf24;">The Watch / Informer Mechanism:</strong>
+            <p id="step-watch-text" style="margin-top:2px;"></p>
+          </div>
+        </div>
+
+        <!-- Interview Gotcha Callout -->
+        <div class="callout-box callout-interview" id="step-interview-box">
+          <span class="callout-icon">💡</span>
+          <div>
+            <strong style="color:#93c5fd;">K8s Interview Pro-Tip:</strong>
+            <p id="step-interview-text" style="margin-top:2px;"></p>
+          </div>
+        </div>
+
+        <!-- Behind the Scenes Wire Protocol Tech Spec -->
+        <div class="tech-spec-card">
+          <div class="tech-spec-header">
+            <span>Behind The Scenes (Wire Protocol)</span>
+            <span id="spec-protocol" style="color:#38bdf8;">HTTPS REST</span>
+          </div>
+          <div class="tech-spec-body" id="tech-spec-body">
+            <!-- Code payload injected by JS -->
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+</div>
+
+<!-- Node Inspector Modal / Drawer -->
+<div class="inspector-card" id="inspector-card">
+  <div class="inspector-header">
+    <div class="inspector-title" id="insp-title">
+      <span>Component Inspector</span>
+    </div>
+    <button class="inspector-close" onclick="closeInspector()">&times;</button>
+  </div>
+  <div class="inspector-body" id="insp-body">
+    Click on any box in the diagram to inspect its exact role, port, watch targets, and internal design.
+  </div>
+</div>
+
+<script>
+// Master Step Definitions (12 Detailed Production Flow Steps)
+const steps = [
+  {
+    num: 1,
+    title: "kubectl client sends HTTPS Scale Request to kube-apiserver",
+    layer: "Client Tier",
+    layerTag: "tag-client",
+    mechanism: "REST over TLS (Port 6443)",
+    mechTag: "tag-controlplane",
+    color: "#3b82f6",
+    glows: ["glow-kubectl", "glow-api"],
+    arrows: ["af-1"],
+    narrative: `User ya CI/CD pipeline command run karta hai: <strong>kubectl scale deployment flipkart-app --replicas=10</strong>.
+    <br><br>
+    kubectl aapke <code>~/.kube/config</code> file se cluster certificate aur token uthata hai aur ek <strong>HTTPS PATCH</strong> request bhejta hai:
+    <span class="term term-blue">PATCH /apis/apps/v1/namespaces/default/deployments/flipkart-app</span>.
+    <br><br>
+    <strong>Kubernetes Rule #1:</strong> External world (kubectl, Helm, CI/CD) cluster me <em>sirf aur sirf</em> <strong>kube-apiserver</strong> se baat kar sakti hai. Kisi aur component ke paas seedhe aane ka direct rasta nahi hota!`,
+    watchText: null,
+    interviewTip: "Interview Question: Kya kubectl seedha etcd me write kar sakta hai? Bilkul nahi! etcd cluster network ke andar private hota hai aur sirf API Server se mTLS authentication ke through connect hota hai.",
+    specProtocol: "HTTP/2 PATCH via TLS",
+    specCode: `PATCH /apis/apps/v1/namespaces/default/deployments/flipkart-app HTTP/2
+Host: k8s-master:6443
+Authorization: Bearer eyJhbGciOiJSUz...
+Content-Type: application/strategic-merge-patch+json
+
+{
+  "spec": {
+    "replicas": 10
+  }
+}`
+  },
+  {
+    num: 2,
+    title: "kube-apiserver: Authentication &rarr; Authorization &rarr; Admission Control",
+    layer: "Control Plane",
+    layerTag: "tag-controlplane",
+    mechanism: "API Server Internal Pipeline",
+    mechTag: "tag-controlplane",
+    color: "#3b82f6",
+    glows: ["glow-api"],
+    arrows: [],
+    narrative: `API Server request receive karne ke baad 3-stage security pipeline se pass karta hai:
+    <br><br>
+    1. <strong>Authentication (AuthN):</strong> Check karta hai client kaun hai (X509 Client Cert, OIDC, ya ServiceAccount token).<br>
+    2. <strong>Authorization (AuthZ):</strong> RBAC check karta hai: Kya user <code>admin</code> ke paas namespace <code>default</code> me deployments ko <code>patch</code> karne ka adhikar hai?<br>
+    3. <strong>Mutating &amp; Validating Admission Controllers:</strong> Check karta hai OPA Gatekeeper / Kyverno policies, resource quotas, aur default settings inject karta hai.`,
+    watchText: null,
+    interviewTip: "Mutating Admission controllers request ko modify/inject kar sakte hain (jaise Istio sidecar injection), jabki Validating Admission controllers sirf YES/NO bolte hain.",
+    specProtocol: "API Server Internal Handlers",
+    specCode: `Pipeline Stages:
+1. AuthN: User="devops-lead", Groups=["system:masters"]
+2. AuthZ: RBAC ClusterRoleBinding -> Allowed: Rule match
+3. Mutating Webhooks: Default annotations applied
+4. Schema Validation: Spec matches OpenAPI v3 schema
+5. Validating Webhooks: Quota check OK (Max Replicas: 50)`
+  },
+  {
+    num: 3,
+    title: "kube-apiserver saves Desired State (10 replicas) into etcd",
+    layer: "Control Plane & Storage",
+    layerTag: "tag-storage",
+    mechanism: "gRPC over mTLS (Port 2379)",
+    mechTag: "tag-storage",
+    color: "#8b5cf6",
+    glows: ["glow-api", "glow-etcd"],
+    arrows: ["af-2"],
+    narrative: `Validation pass hone ke baad, <strong>kube-apiserver</strong> etcd ko gRPC call karta hai aur new desired state persist karta hai:
+    <span class="term term-purple">Key: /registry/deployments/default/flipkart-app</span>, Replicas = 10.
+    <br><br>
+    etcd isko apne <strong>Raft consensus log</strong> (WAL - Write Ahead Log) me likhta hai aur multi-version concurrency control (MVCC) revision update karta hai. etcd se confirmation milte hi API Server kubectl ko <strong>HTTP 200 OK</strong> response return kar deta hai.`,
+    watchText: null,
+    interviewTip: "etcd is a distributed, consistent Key-Value store based on Raft. K8s cluster ka pura state etcd me hota hai; agar etcd ka backup hai to pura cluster restore kiya ja sakta hai.",
+    specProtocol: "gRPC KV Put",
+    specCode: `rpc Put(PutRequest) returns (PutResponse) {
+  key: "/registry/deployments/default/flipkart-app"
+  value: {
+    "metadata": { "name": "flipkart-app", "generation": 2 },
+    "spec": { "replicas": 10 }
+  }
+  prev_kv: { "replicas": 3 }
+}
+-> etcd Revision: 184920 (WAL synced to disk)`
+  },
+  {
+    num: 4,
+    title: "Watch Event Pushed to Controller Manager (Deployment & ReplicaSet)",
+    layer: "Control Plane",
+    layerTag: "tag-controlplane",
+    mechanism: "👁️ Long-Lived Watch Stream",
+    mechTag: "tag-watch",
+    color: "#f59e0b",
+    glows: ["glow-ctrl", "glow-api"],
+    arrows: ["af-3"],
+    narrative: `Ab magic shuru hota hai! <strong>kube-controller-manager</strong> ne API Server se pehle se hi ek <em>permanent HTTP/2 Watch connection</em> bana rakha tha.
+    <br><br>
+    Jaise hi etcd me Deployment update hua, API Server ne turant Controller Manager ko <strong>Push notification</strong> bheja:
+    <span class="term term-gold">Event: MODIFIED (flipkart-app replicas = 10)</span>.
+    <br><br>
+    <strong>Deployment Controller</strong> wake-up hota hai aur underlying <strong>ReplicaSet</strong> ki target replicas ko 10 set kar deta hai.`,
+    watchText: "Ye PULL polling nahi hai! Kubernetes me controllers bar-bar 'kya naya hai?' nahi poochhte. Client-go Informer / Reflector pattern me HTTP/2 stream open rehti hai. API Server khud changes push karta hai as Event chunks!",
+    interviewTip: "What is an Informer in Kubernetes? Informer is a client-go caching mechanism that uses 'ListWatch' (initial list + streaming watch) and maintains a local in-memory cache with DeltaFIFO queues to prevent overloading the API server.",
+    specProtocol: "HTTP/2 Event Stream Push",
+    specCode: `GET /apis/apps/v1/deployments?watch=true HTTP/2
+Transfer-Encoding: chunked
+
+{
+  "type": "MODIFIED",
+  "object": {
+    "kind": "Deployment",
+    "metadata": { "name": "flipkart-app", "resourceVersion": "184920" },
+    "spec": { "replicas": 10 }
+  }
+}`
+  },
+  {
+    num: 5,
+    title: "ReplicaSet Controller reconciles: Gap of 7 Pods detected!",
+    layer: "Control Plane",
+    layerTag: "tag-controlplane",
+    mechanism: "Reconciliation Loop & API Call",
+    mechTag: "tag-controlplane",
+    color: "#f59e0b",
+    glows: ["glow-ctrl", "glow-api", "glow-etcd"],
+    arrows: ["af-4", "af-5"],
+    narrative: `Controller Manager ke andar <strong>ReplicaSet Controller</strong> apna <em>Reconcile Loop</em> chalata hai:
+    <br><br>
+    <code>Desired Replicas (10) - Current Replicas (3) = 7 Pods missing!</code>
+    <br><br>
+    ReplicaSet Controller khud container run nahi kar sakta. Woh API Server ko 7 alag-alag <strong>POST /api/v1/namespaces/default/pods</strong> requests bhejta hai.
+    <br><br>
+    API Server in 7 Pods ko validate karke etcd me likhta hai:
+    <span class="term term-blue">spec.nodeName: ""</span> (Khaali) aur <span class="term term-gold">status.phase: Pending</span>.`,
+    watchText: null,
+    interviewTip: "Note karo: Controller Manager Pod manifest me node ka naam nahi daalta! Wo nodeName ko blank chhod deta hai. Node assign karna sirf aur sirf Scheduler ka kaam hai.",
+    specProtocol: "HTTP/2 POST /api/v1/pods",
+    specCode: `POST /api/v1/namespaces/default/pods
+{
+  "metadata": { "name": "flipkart-app-d8f9b-4" },
+  "spec": {
+    "nodeName": "",          <-- EMPTY! Needs scheduling
+    "containers": [{
+      "name": "app",
+      "image": "flipkart/web:v2"
+    }]
+  },
+  "status": { "phase": "Pending" }
+}`
+  },
+  {
+    num: 6,
+    title: "kube-scheduler catches Pending Pods via Watch stream",
+    layer: "Control Plane",
+    layerTag: "tag-controlplane",
+    mechanism: "👁️ Long-Lived Watch Stream",
+    mechTag: "tag-watch",
+    color: "#f59e0b",
+    glows: ["glow-sched", "glow-api"],
+    arrows: ["af-6"],
+    narrative: `<strong>kube-scheduler</strong> bhi API Server ko continuously <em>Watch</em> kar raha hai!
+    <br><br>
+    Specifically wo filter laga ke rakhta hai: <code>fieldSelector: spec.nodeName==""</code> (wo saare Pods jinka koi node assign nahi hua hai).
+    <br><br>
+    API Server 7 naye Pending Pods ke <span class="term term-gold">Event: ADDED</span> Scheduler ke Informer ko push karta hai. Scheduler inhe apne internal <strong>Scheduling Priority Queue (activeQ)</strong> me queue kar leta hai.`,
+    watchText: "Scheduler bhi seedha etcd nahi dekhta. Scheduler ka Informer API Server ke saath HTTP/2 streaming session rakhta hai aur jaise hi naya unassigned Pod create hota hai, turant activate ho jata hai.",
+    interviewTip: "Agar cluster me Scheduler crash ho jaye, to kya hoga? Naye Pods create ho jayenge, lekin hamesha 'Pending' state me rahenge kyunki unhe koi node assign karne wala nahi hoga!",
+    specProtocol: "HTTP/2 Watch Filter",
+    specCode: `GET /api/v1/pods?fieldSelector=spec.nodeName%3D%22%22&watch=true
+
+{
+  "type": "ADDED",
+  "object": {
+    "metadata": { "name": "flipkart-app-d8f9b-4" },
+    "spec": { "nodeName": "" },
+    "status": { "phase": "Pending" }
+  }
+}`
+  },
+  {
+    num: 7,
+    title: "Scheduler 2-Phase Algorithm: Filtering (Predicates) & Scoring (Priorities)",
+    layer: "Control Plane",
+    layerTag: "tag-controlplane",
+    mechanism: "Internal Compute Cycle",
+    mechTag: "tag-controlplane",
+    color: "#3b82f6",
+    glows: ["glow-sched"],
+    arrows: ["af-7"],
+    narrative: `Scheduler har pending Pod ke liye do primary phases execute karta hai:
+    <br><br>
+    <strong>Phase 1: Filtering (Predicates):</strong> Unfit nodes ko bahar fekta hai:
+    <br>&bull; <em>NodeResourcesFit:</em> Kya node ke paas required CPU/RAM hai?
+    <br>&bull; <em>Taints &amp; Tolerations:</em> Kya node tainted hai?
+    <br>&bull; <em>NodeAffinity:</em> Kya label matches hain?
+    <br><br>
+    <strong>Phase 2: Scoring (Priorities):</strong> Bacche hue nodes ko 0-100 score deta hai:
+    <br>&bull; <em>LeastAllocated / BalancedAllocation:</em> Resources ko balance rakhna.
+    <br>&bull; <em>ImageLocality:</em> Kya docker image pehle se node pe cached hai?
+    <br><br>
+    Faisla: <strong>Worker-Node-1</strong> gets highest score (96/100)!`,
+    watchText: null,
+    interviewTip: "Interview Question: Kya Scheduler khud Pod ko start karta hai? Nahi! Scheduler sirf ek matchmaker hai—ye sirf yeh decide karta hai ki kaunsa Pod kaunse Node pe jayega.",
+    specProtocol: "Scheduler Algorithm Pipeline",
+    specCode: `Scheduling Pod: flipkart-app-d8f9b-4
+Nodes evaluated: [node-1, node-2, node-3]
+
+Filter Phase:
+  node-1: PASS (CPU: 4 cores free, RAM: 8GB free)
+  node-2: PASS (CPU: 2 cores free, RAM: 4GB free)
+  node-3: FAIL (Tainted: dedicated=database)
+
+Score Phase:
+  node-1 Score: 96 (Image flipkart/web:v2 cached + high RAM)
+  node-2 Score: 78
+-> WINNER: node-1`
+  },
+  {
+    num: 8,
+    title: "Scheduler issues Binding Request &rarr; API Server updates etcd",
+    layer: "Control Plane",
+    layerTag: "tag-controlplane",
+    mechanism: "POST /binding to API Server",
+    mechTag: "tag-controlplane",
+    color: "#3b82f6",
+    glows: ["glow-sched", "glow-api", "glow-etcd"],
+    arrows: ["af-8", "af-2"],
+    narrative: `Scheduler apna decision execute karne ke liye API Server ko ek <strong>Binding</strong> object POST karta hai:
+    <span class="term term-blue">POST /api/v1/namespaces/default/pods/flipkart-app-d8f9b-4/binding</span>.
+    <br><br>
+    Target node: <code>worker-node-1</code>.
+    <br><br>
+    API Server etcd me Pod object ko update karta hai: <code>spec.nodeName = "worker-node-1"</code>.
+    Ab Pod officially <strong>Scheduled</strong> ho chuka hai, lekin container abhi tak run nahi hua!`,
+    watchText: null,
+    interviewTip: "Never forget: Scheduler directly etcd ko touch nahi karta! Wo bhi API Server ke /binding subresource endpoint pe HTTP call karta hai.",
+    specProtocol: "HTTP/2 Binding Subresource",
+    specCode: `POST /api/v1/namespaces/default/pods/flipkart-app-d8f9b-4/binding
+{
+  "apiVersion": "v1",
+  "kind": "Binding",
+  "target": {
+    "apiVersion": "v1",
+    "kind": "Node",
+    "name": "worker-node-1"
+  }
+}
+-> etcd updated: spec.nodeName = "worker-node-1"`
+  },
+  {
+    num: 9,
+    title: "Worker Node's kubelet catches its assigned Pod (via Watch!)",
+    layer: "Worker Node",
+    layerTag: "tag-workernode",
+    mechanism: "👁️ Node-Filtered Watch Stream",
+    mechTag: "tag-watch",
+    color: "#10b981",
+    glows: ["glow-kubelet", "glow-api"],
+    arrows: ["af-9"],
+    narrative: `<strong>Yeh sabse important step hai jo notes me tha!</strong>
+    <br><br>
+    <strong>kubelet</strong> Worker Node ka captain hai. Ye Worker Node pe chal raha hota hai (<span class="term term-green">Green Layer</span>), <strong>LEKIN</strong> ye API Server ke saath <em>continuous Watch stream</em> maintain karta hai (<span class="term term-gold">Gold Watcher 👁️</span>):
+    <br><br>
+    <code>GET /api/v1/pods?fieldSelector=spec.nodeName=worker-node-1&watch=true</code>
+    <br><br>
+    Jaise hi API Server ne etcd me <code>spec.nodeName = "worker-node-1"</code> likha, API Server ne <strong>Worker-Node-1 ke kubelet</strong> ko push kiya: <em>'Tumhare liye naya Pod assign hua hai!'</em>`,
+    watchText: "Aapka doubt: Kubelet worker node ka part hai (Green), lekin uska kaam karne ka tareeqa Watch connection hai (Gold 👁️)! Isliye diagram me Kubelet ke paas dono badges hain: [WORKER NODE] + [👁️ WATCHER]. Kubelet na to polling karta hai, na hi etcd se baat karta hai.",
+    interviewTip: "How does kubelet know about its pods? kubelet runs a SyncLoop driven by an Informer that watches the API Server filtered strictly by its own node name.",
+    specProtocol: "HTTP/2 Field-Filtered Watch Push",
+    specCode: `GET /api/v1/pods?fieldSelector=spec.nodeName%3Dworker-node-1&watch=true
+
+{
+  "type": "MODIFIED",
+  "object": {
+    "metadata": { "name": "flipkart-app-d8f9b-4" },
+    "spec": { "nodeName": "worker-node-1" },
+    "status": { "phase": "Pending" }
+  }
+}`
+  },
+  {
+    num: 10,
+    title: "kubelet coordinates CRI (containerd), CNI (Network), & CSI (Storage)",
+    layer: "Worker Node Execution",
+    layerTag: "tag-workernode",
+    mechanism: "gRPC CRI Unix Socket (/run/containerd/containerd.sock)",
+    mechTag: "tag-workernode",
+    color: "#06b6d4",
+    glows: ["glow-kubelet", "glow-runtime", "glow-pod"],
+    arrows: ["af-10", "af-10b"],
+    narrative: `kubelet ab node pe locally 3 modular systems ko order deta hai:
+    <br><br>
+    1. <strong>CSI (Storage):</strong> ConfigMaps, Secrets, PVC volumes ko host directory me mount karta hai.<br>
+    2. <strong>CRI (Container Runtime Interface):</strong> kubelet gRPC call karta hai containerd ko: <code>RunPodSandbox</code> (pause container banta hai jo network namespace banata hai).<br>
+    3. <strong>CNI (Container Network Interface - Calico/Flannel):</strong> Pod ko IP assign karta hai (e.g. <code>10.244.1.42</code>) aur virtual ethernet (veth pair) create karta hai.<br>
+    4. <strong>Image Pull & Run:</strong> Image pull hoti hai aur application container start hota hai!`,
+    watchText: null,
+    interviewTip: "What is the pause container? Every K8s Pod has an invisible 'pause' infrastructure container that holds the Network namespace (IP address & port mapping) and IPC namespace so containers inside the Pod can communicate over localhost.",
+    specProtocol: "gRPC CRI API",
+    specCode: `1. RunPodSandboxRequest -> Sandbox ID: c3a18d...
+2. CNI Plugin: ADD veth0 -> IP: 10.244.1.42/24
+3. PullImageRequest: "flipkart/web:v2" -> Pulled
+4. CreateContainerRequest:
+   Image: "flipkart/web:v2", Ports: [8080]
+5. StartContainerRequest: Container Started!`
+  },
+  {
+    num: 11,
+    title: "kubelet runs Probes & reports Status (Running) back to API Server",
+    layer: "Worker Node & Control Plane",
+    layerTag: "tag-workernode",
+    mechanism: "PATCH /status to API Server",
+    mechTag: "tag-workernode",
+    color: "#10b981",
+    glows: ["glow-kubelet", "glow-api", "glow-etcd", "glow-pod"],
+    arrows: ["af-11", "af-2"],
+    narrative: `Container start hone ke baad kubelet use turant ready nahi maanta:
+    <br><br>
+    &bull; <strong>Startup Probe:</strong> Check karta hai application bootstrap ho gayi?<br>
+    &bull; <strong>Readiness Probe:</strong> <code>GET /healthz</code> status 200 return karta hai &rarr; Ready!<br>
+    <br>
+    kubelet API Server ko status report bhejta hai:
+    <span class="term term-green">PATCH /api/v1/.../pods/status</span>:
+    <code>phase = "Running"</code>, <code>PodReady = True</code>, <code>IP = 10.244.1.42</code>.
+    <br><br>
+    API Server yeh data etcd me save karta hai.`,
+    watchText: null,
+    interviewTip: "Difference between Liveness and Readiness probe: Liveness failure results in kubelet killing and restarting the container. Readiness failure removes the Pod from Service Endpoints so no user traffic is sent to it.",
+    specProtocol: "HTTP/2 PATCH /status",
+    specCode: `PATCH /api/v1/namespaces/default/pods/flipkart-app-d8f9b-4/status
+{
+  "status": {
+    "phase": "Running",
+    "podIP": "10.244.1.42",
+    "conditions": [
+      { "type": "Ready", "status": "True" },
+      { "type": "ContainersReady", "status": "True" }
+    ]
+  }
+}`
+  },
+  {
+    num: 12,
+    title: "kube-proxy & EndpointSlice: iptables/IPVS updated, Traffic live!",
+    layer: "Worker Node & Network Data Plane",
+    layerTag: "tag-workernode",
+    mechanism: "👁️ Watcher + Linux Kernel Netfilter (iptables/IPVS/eBPF)",
+    mechTag: "tag-watch",
+    color: "#10b981",
+    glows: ["glow-proxy", "glow-api", "glow-pod"],
+    arrows: ["af-12"],
+    narrative: `Final step! Pod ready ho gaya, lekin users tak traffic kaise pahuchega?
+    <br><br>
+    1. Controller Manager ka <strong>EndpointSlice Controller</strong> watch kar raha tha. Pod ready hote hi usne Service ke <code>EndpointSlice</code> me new Pod IP <code>10.244.1.42:8080</code> add kiya.<br>
+    2. <strong>kube-proxy</strong> (jo har worker node pe chal raha hai aur EndpointSlices ko <span class="term term-gold">Watch</span> kar raha hai) detect karta hai new endpoint!<br>
+    3. kube-proxy node ke Linux kernel me <strong>iptables / IPVS / eBPF</strong> rules update karta hai.<br>
+    <br>
+    Ab user traffic automatically sabhi 10 Pods me equally load balance hone lagta hai! 🎉 Flipkart Big Billion Day Sale ready!`,
+    watchText: "Notice karo: kube-proxy bhi ek Worker Node component hai (Green), lekin wo bhi API Server ke saath Watch stream banakar rakhta hai (Gold 👁️) taaki Services aur Endpoints ke changes turant kernel me push kar sake!",
+    interviewTip: "Why IPVS over iptables in kube-proxy? iptables is sequential O(n) lookup. When cluster has 10,000+ services, iptables creates severe packet delay. IPVS uses hash tables with O(1) performance!",
+    specProtocol: "Kernel Netfilter Rules Update",
+    specCode: `EndpointSlice updated:
+- Endpoint: 10.244.1.42:8080 (Ready: true)
+
+kube-proxy kernel sync:
+- iptables -t nat -A KUBE-SVC-FLIPKART -m statistic --mode random --probability 0.10 -j KUBE-SEP-POD4
+- Packet DNAT -> 10.244.1.42:8080
+Total Pods serving traffic: 10/10 [SUCCESS]`
+  }
+];
+
+// Component metadata for Inspector
+const nodeInfo = {
+  kubectl: {
+    title: "kubectl (K8s Client CLI)",
+    tier: "Client Tier",
+    port: "Outbound HTTPS 6443",
+    watch: "None (Client initiator)",
+    role: "User commands, YAML manifests, aur CI/CD pipelines ko HTTP REST requests me convert karta hai. Sirf kube-apiserver se baat karta hai."
+  },
+  apiserver: {
+    title: "kube-apiserver",
+    tier: "Control Plane (Master Node)",
+    port: "6443 (HTTPS)",
+    watch: "Serves watch streams to controllers, schedulers, and kubelets via HTTP/2",
+    role: "Cluster ka single gateway aur brain. AuthN, AuthZ, Admission Control karta hai. Pure cluster me sirf yahi ek akela component hai jo direct etcd se baat karta hai."
+  },
+  etcd: {
+    title: "etcd",
+    tier: "Storage Engine (Master Node)",
+    port: "2379 (Client), 2380 (Peer Raft)",
+    watch: "Internal Raft consensus WAL",
+    role: "Highly-available, distributed key-value store. Cluster ka complete state (MVCC revisions) persist karta hai. K8s ka source-of-truth."
+  },
+  controllermanager: {
+    title: "kube-controller-manager",
+    tier: "Control Plane (Master Node)",
+    port: "10257 (HTTPS Metrics)",
+    watch: "👁️ ACTIVE WATCHER: Deployments, ReplicaSets, Nodes, Endpoints, Namespaces",
+    role: "Non-stop reconciliation loop chalta hai: 'Current State == Desired State?'. Agar gap hai to nayi Pods create karne ka order API Server ko deta hai."
+  },
+  scheduler: {
+    title: "kube-scheduler",
+    tier: "Control Plane (Master Node)",
+    port: "10259 (HTTPS Metrics)",
+    watch: "👁️ ACTIVE WATCHER: Pods where spec.nodeName == ''",
+    role: "2-Phase Scheduling Algorithm: Filtering (Predicates) & Scoring (Priorities). Decide karta hai kaunsi Pod kaunse Worker Node pe jayegi aur API Server ko /binding bhejta hai."
+  },
+  kubelet: {
+    title: "kubelet",
+    tier: "Worker Node Agent",
+    port: "10250 (HTTPS API), 10248 (Healthz)",
+    watch: "👁️ ACTIVE WATCHER: Pods where spec.nodeName == [this-node]",
+    role: "Worker node ka local captain. API Server se apne node ke pods watch karta hai, CRI se container chalwata hai, CNI se network connect karta hai, aur health probes report karta hai."
+  },
+  runtime: {
+    title: "Container Runtime (containerd) & CNI",
+    tier: "Worker Node Runtime",
+    port: "Unix Domain Socket (/run/containerd/containerd.sock)",
+    watch: "None (Driven by kubelet via gRPC CRI)",
+    role: "CRI containerd container images pull karta hai aur Linux cgroups/namespaces configure karta hai. CNI plugin (Calico/Flannel) Pod IP allocate karta hai aur veth network establish karta hai."
+  },
+  pod: {
+    title: "Pod & Container Sandbox",
+    tier: "Workload Runtime",
+    port: "Container Port (e.g. 8080)",
+    watch: "None",
+    role: "K8s ki smallest deployable unit. Ek Pod me ek ya multiple containers shared network (localhost) aur shared storage volumes share karte hain."
+  },
+  kubeproxy: {
+    title: "kube-proxy",
+    tier: "Worker Node Network",
+    port: "10256 (Healthz)",
+    watch: "👁️ ACTIVE WATCHER: Services and EndpointSlices",
+    role: "Har worker node pe chal kar Linux Kernel netfilter (iptables, IPVS, ya eBPF) rules maintain karta hai taaki ClusterIP aur Service traffic pod IPs tak route ho sake."
+  }
+};
+
+let currentStep = 0;
+let autoPlayInterval = null;
+let isWatchMeshActive = false;
+
+// All element IDs for transitions
+const glowIds = [
+  "glow-kubectl", "glow-api", "glow-etcd", "glow-ctrl",
+  "glow-sched", "glow-kubelet", "glow-runtime", "glow-pod", "glow-proxy"
+];
+
+const flowIds = [
+  "af-1", "af-2", "af-3", "af-4", "af-5", "af-6",
+  "af-7", "af-8", "af-9", "af-10", "af-10b", "af-11", "af-12"
+];
+
+const watchMeshIds = [
+  "mesh-w-ctrl", "mesh-w-sched", "mesh-w-kubelet", "mesh-w-proxy"
+];
+
+// Initialize Scrubber UI
+function initScrubber() {
+  const container = document.getElementById('step-scrubber');
+  container.innerHTML = '';
+  steps.forEach((s, idx) => {
+    const dot = document.createElement('button');
+    dot.className = `scrub-dot ${idx === 0 ? 'active' : ''}`;
+    dot.textContent = s.num;
+    dot.title = `Step ${s.num}: ${s.title}`;
+    dot.onclick = () => jumpToStep(idx);
+    container.appendChild(dot);
+  });
+}
+
+function jumpToStep(idx) {
+  currentStep = idx;
+  renderStep();
+}
+
+function changeStep(dir) {
+  currentStep = Math.max(0, Math.min(steps.length - 1, currentStep + dir));
+  renderStep();
+}
+
+function renderStep() {
+  const s = steps[currentStep];
+
+  // Update Header & Tags
+  document.getElementById('step-pill').textContent = `STEP ${s.num}`;
+  document.getElementById('step-pill').style.background = s.color + '22';
+  document.getElementById('step-pill').style.color = s.color;
+  document.getElementById('step-pill').style.borderColor = s.color;
+
+  document.getElementById('step-title').textContent = s.title;
+
+  const tagsContainer = document.getElementById('step-tags');
+  tagsContainer.innerHTML = `
+    <span class="tag ${s.layerTag}">${s.layer}</span>
+    <span class="tag ${s.mechTag}">${s.mechanism}</span>
+  `;
+
+  // Update Narrative & Specs
+  document.getElementById('step-narrative').innerHTML = s.narrative;
+
+  // Watch callout
+  const watchBox = document.getElementById('step-watch-box');
+  if (s.watchText) {
+    watchBox.style.display = 'flex';
+    document.getElementById('step-watch-text').innerHTML = s.watchText;
+  } else {
+    watchBox.style.display = 'none';
+  }
+
+  // Interview Tip
+  document.getElementById('step-interview-text').innerHTML = s.interviewTip;
+
+  // Tech spec
+  document.getElementById('spec-protocol').textContent = s.specProtocol;
+  document.getElementById('tech-spec-body').textContent = s.specCode;
+
+  // Update Scrubber & Buttons
+  document.getElementById('step-counter').textContent = `Step ${s.num} of ${steps.length}`;
+  document.querySelectorAll('.scrub-dot').forEach((d, idx) => {
+    d.classList.toggle('active', idx === currentStep);
+  });
+
+  document.getElementById('btn-prev').disabled = currentStep === 0;
+  document.getElementById('btn-next').disabled = currentStep === steps.length - 1;
+
+  // Update SVG Glows
+  glowIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.setAttribute('opacity', s.glows.includes(id) ? '1' : '0');
+    }
+  });
+
+  // Update SVG Flows
+  flowIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.setAttribute('opacity', s.arrows.includes(id) ? '1' : '0');
+    }
+  });
+}
+
+// Toggle Informer Watch Stream Overlay
+function toggleWatchMesh() {
+  isWatchMeshActive = !isWatchMeshActive;
+  const btn = document.getElementById('btn-toggle-watch');
+  const text = document.getElementById('watch-toggle-text');
+  
+  btn.classList.toggle('active', isWatchMeshActive);
+  text.textContent = isWatchMeshActive ? "Hide Watches" : "Watch Streams";
+
+  watchMeshIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      if (isWatchMeshActive) {
+        el.setAttribute('opacity', '0.9');
+        el.classList.add('pulse-anim');
+      } else {
+        el.setAttribute('opacity', '0.25');
+        el.classList.remove('pulse-anim');
+      }
+    }
+  });
+}
+
+// Auto play flow
+function toggleAutoPlay() {
+  if (autoPlayInterval) {
+    clearInterval(autoPlayInterval);
+    autoPlayInterval = null;
+    document.getElementById('play-icon').textContent = '▶';
+    document.getElementById('play-text').textContent = 'Auto Play';
+    document.getElementById('btn-autoplay').classList.remove('btn-primary');
+  } else {
+    document.getElementById('play-icon').textContent = '⏸';
+    document.getElementById('play-text').textContent = 'Pause';
+    document.getElementById('btn-autoplay').classList.add('btn-primary');
+    
+    if (currentStep === steps.length - 1) currentStep = 0;
+    renderStep();
+
+    autoPlayInterval = setInterval(() => {
+      if (currentStep < steps.length - 1) {
+        currentStep++;
+        renderStep();
+      } else {
+        toggleAutoPlay();
+      }
+    }, 3800);
+  }
+}
+
+function resetFlow() {
+  if (autoPlayInterval) toggleAutoPlay();
+  currentStep = 0;
+  renderStep();
+}
+
+// Node Inspector
+function showNodeInspector(nodeKey) {
+  const info = nodeInfo[nodeKey];
+  if (!info) return;
+
+  const card = document.getElementById('inspector-card');
+  document.getElementById('insp-title').innerHTML = `🔍 ${info.title}`;
+  document.getElementById('insp-body').innerHTML = `
+    <div style="margin-bottom:5px;"><strong>Tier:</strong> <span class="term term-blue">${info.tier}</span></div>
+    <div style="margin-bottom:5px;"><strong>Port / Socket:</strong> <code>${info.port}</code></div>
+    <div style="margin-bottom:5px;"><strong>Watch Mechanism:</strong> <span class="term term-gold">${info.watch}</span></div>
+    <div class="inspector-field">
+      <div class="inspector-field-label">Architectural Role</div>
+      <p style="margin-top:3px;">${info.role}</p>
+    </div>
+  `;
+  card.style.display = 'block';
+}
+
+function closeInspector() {
+  document.getElementById('inspector-card').style.display = 'none';
+}
+
+// Keyboard navigation (Left/Right arrows, Spacebar, A for Autoplay, W for Watch)
+window.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  
+  if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+    e.preventDefault();
+    if (currentStep < steps.length - 1) changeStep(1);
+  } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+    e.preventDefault();
+    if (currentStep > 0) changeStep(-1);
+  } else if (e.key === 'a' || e.key === 'A') {
+    toggleAutoPlay();
+  } else if (e.key === 'w' || e.key === 'W') {
+    toggleWatchMesh();
+  } else if (e.key === 'Escape') {
+    closeInspector();
+  }
+});
+
+// Boot
+initScrubber();
+renderStep();
+</script>
+</body>
+</html>
